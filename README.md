@@ -8,97 +8,1286 @@
 
 Чтобы составить документ с описанием текущей архитектуры приложения, можно часть информации взять из описания компании и условия задания. Это нормально.
 
-</aside
+</aside>
 
-### 1. Описание функциональности монолитного приложения
+## 1. Описание функциональности монолитного приложения
 
-**Управление отоплением:**
+### Управление отоплением
 
-- Пользователи могут…
-- Система поддерживает…
-- …
+* Пользователи могут включать и выключать отопление в доме через веб-интерфейс.
+* Система поддерживает базовое управление отоплением: включение и отключение.
+* Управление отоплением реализовано внутри монолитного приложения.
+* Пользовательский запрос обрабатывается синхронно: приложение получает команду и отправляет её дальше в сторону устройства или датчика.
+* Сейчас система ориентирована только на один тип устройства — отопление.
 
-**Мониторинг температуры:**
+### Мониторинг температуры
 
-- Пользователи могут…
-- Система поддерживает…
-- …
+* Пользователи могут смотреть текущую температуру в помещениях.
+* Система получает данные с температурных датчиков.
+* Система отображает пользователю актуальное значение температуры.
+* Данные о температуре используются для контроля состояния отопления.
+* Историческая телеметрия, сложная аналитика и сценарии автоматизации в текущем решении не выделены в отдельные компоненты.
 
-### 2. Анализ архитектуры монолитного приложения
+### Работа с датчиками
 
-Перечислите здесь основные особенности текущего приложения: какой язык программирования используется, какая база данных, как организовано взаимодействие между компонентами и так далее.
+* Датчики температуры подключаются к системе.
+* Подключение и настройка датчиков сейчас требует участия специалиста.
+* Пользователь не может самостоятельно подключить новое устройство через интерфейс самообслуживания.
+* Система не рассчитана на массовое подключение разных типов устройств: освещения, ворот, камер, датчиков партнёров.
 
-### 3. Определение доменов и границы контекстов
+---
 
-Опишите здесь домены, которые вы выделили.
+## 2. Анализ архитектуры монолитного приложения
 
-### **4. Проблемы монолитного решения**
+Текущее приложение реализовано как монолит.
 
-- …
-- …
-- …
+Основные особенности текущей архитектуры:
 
-Если вы считаете, что текущее решение не вызывает проблем, аргументируйте свою позицию.
+* Язык программирования: **Go**.
+* База данных: **PostgreSQL**.
+* Архитектурный стиль: **монолитное приложение**.
+* Веб-интерфейс обращается напрямую к монолитному backend-приложению.
+* Вся бизнес-логика находится внутри одного приложения.
+* Работа с отоплением, температурой, датчиками и базой данных реализована в одной кодовой базе.
+* Взаимодействие с датчиками происходит синхронно.
+* Масштабирование возможно только всего приложения целиком.
+* База данных общая для всего монолита.
+* Отдельных сервисов для устройств, телеметрии, сценариев, уведомлений и партнёрских интеграций нет.
 
-### 5. Визуализация контекста системы — диаграмма С4
+Текущая схема взаимодействия:
 
-Добавьте сюда диаграмму контекста в модели C4.
+```text
+Пользователь
+    |
+    v
+Web UI
+    |
+    v
+Монолитное приложение Smart Home на Go
+    |
+    v
+PostgreSQL
 
-Чтобы добавить ссылку в файл Readme.md, нужно использовать синтаксис Markdown. Это делают так:
-
-```markdown
-[Текст ссылки](URL)
+Монолитное приложение также взаимодействует с датчиками температуры и отопления.
 ```
 
-Замените `Текст ссылки` текстом, который хотите использовать для ссылки. Вместо `URL` вставьте адрес, на который должна вести ссылка. Например:
+Плюсы текущего решения:
+
+* Простая архитектура.
+* Легко разрабатывать и запускать на старте.
+* Одна кодовая база.
+* Одна база данных.
+* Меньше инфраструктурной сложности.
+* Быстрое внесение небольших изменений при малом количестве функций.
+
+Минусы текущего решения:
+
+* Сложно масштабировать отдельные функции.
+* Сложно добавлять новые типы устройств.
+* Любое изменение требует пересборки и деплоя всего монолита.
+* Нет независимого развития разных частей системы.
+* Нет возможности гибко подключать партнёрские устройства.
+* Нет асинхронной обработки команд и телеметрии.
+* Единая база данных связывает все части системы.
+
+---
+
+## 3. Определение доменов и границы контекстов
+
+Для целевой SaaS-системы умного дома можно выделить следующие домены и bounded contexts.
+
+### Пользователи и доступ
+
+Ответственность:
+
+* регистрация пользователей;
+* авторизация;
+* управление профилем;
+* управление ролями;
+* права доступа к домам и устройствам.
+
+Граница контекста:
+
+* пользователь;
+* роль;
+* права доступа;
+* сессия.
+
+---
+
+### Дома и помещения
+
+Ответственность:
+
+* хранение информации о домах пользователя;
+* хранение информации о комнатах и зонах;
+* привязка устройств к дому и комнате.
+
+Граница контекста:
+
+* дом;
+* помещение;
+* зона;
+* владелец дома.
+
+---
+
+### Управление устройствами
+
+Ответственность:
+
+* регистрация устройств;
+* самостоятельное подключение устройства пользователем;
+* хранение информации о типах устройств;
+* хранение информации о возможностях устройств;
+* отслеживание статуса устройства.
+
+Граница контекста:
+
+* устройство;
+* тип устройства;
+* модель устройства;
+* производитель;
+* capability;
+* статус устройства.
+
+---
+
+### Команды устройств
+
+Ответственность:
+
+* приём команд от пользователя;
+* валидация команды;
+* отправка команды устройству;
+* хранение истории команд;
+* обработка статусов выполнения команды.
+
+Граница контекста:
+
+* команда;
+* параметры команды;
+* статус команды;
+* результат выполнения.
+
+---
+
+### Телеметрия
+
+Ответственность:
+
+* получение данных от датчиков;
+* хранение текущих значений;
+* хранение истории измерений;
+* предоставление данных другим сервисам;
+* публикация событий об изменениях.
+
+Граница контекста:
+
+* показание датчика;
+* метрика;
+* единица измерения;
+* временная метка;
+* состояние устройства.
+
+---
+
+### Сценарии автоматизации
+
+Ответственность:
+
+* создание пользовательских правил;
+* проверка условий;
+* выполнение действий;
+* запуск команд по событиям телеметрии.
+
+Пример сценария:
+
+```text
+Если температура в гостиной ниже 18 градусов,
+то включить отопление и установить температуру 23 градуса.
+```
+
+Граница контекста:
+
+* сценарий;
+* условие;
+* действие;
+* правило;
+* событие.
+
+---
+
+### Каталог модулей и комплектов
+
+Ответственность:
+
+* хранение доступных комплектов устройств;
+* описание модулей;
+* описание совместимости;
+* отображение пользователю доступных решений.
+
+Граница контекста:
+
+* модуль;
+* комплект;
+* описание;
+* цена;
+* совместимость.
+
+---
+
+### Партнёрские интеграции
+
+Ответственность:
+
+* подключение устройств сторонних производителей;
+* преобразование внешних протоколов во внутреннюю модель;
+* адаптеры для разных производителей.
+
+Граница контекста:
+
+* партнёр;
+* внешний протокол;
+* адаптер;
+* внешнее устройство.
+
+---
+
+### Уведомления
+
+Ответственность:
+
+* отправка уведомлений пользователю;
+* push/email/SMS;
+* уведомления о тревогах;
+* уведомления о статусе устройств.
+
+Граница контекста:
+
+* уведомление;
+* канал доставки;
+* шаблон;
+* статус отправки.
+
+---
+
+### Видеонаблюдение
+
+Ответственность:
+
+* подключение камер;
+* получение видеопотока;
+* хранение метаданных видео;
+* работа с архивом записей.
+
+Граница контекста:
+
+* камера;
+* видеопоток;
+* запись;
+* архив;
+* снимок.
+
+---
+
+## 4. Проблемы монолитного решения
+
+* Монолит сложно масштабировать частями. Если возрастает нагрузка только на телеметрию, приходится масштабировать всё приложение.
+* Сложно добавлять новые типы устройств: свет, ворота, камеры, датчики дыма, датчики воды.
+* Пользователь не может самостоятельно подключать устройства.
+* Для подключения датчиков требуется специалист.
+* Вся логика находится в одной кодовой базе, из-за этого изменения в одной части могут сломать другую.
+* Отсутствует независимый деплой отдельных функциональных частей.
+* Отсутствует асинхронная обработка команд устройствам.
+* Отсутствует асинхронный поток телеметрии.
+* Устройство может быть недоступно, но синхронный пользовательский запрос будет ждать ответ.
+* Единая база данных создаёт сильную связанность между частями системы.
+* Сложно подключать партнёрские устройства.
+* Нет выделенного слоя интеграций.
+* Нет универсальной модели устройства через capabilities.
+* Нет отдельного сервиса сценариев автоматизации.
+* Нет отдельного сервиса уведомлений.
+* Нет отдельного сервиса видеонаблюдения.
+
+Вывод:
+
+Текущее монолитное решение подходит для небольшой системы управления отоплением, но не подходит для SaaS-экосистемы умного дома, где пользователи должны самостоятельно подключать разные устройства и управлять ими через единую платформу.
+
+---
+
+## 5. Визуализация контекста системы — диаграмма C4
+
+Диаграмма контекста показывает систему целиком и внешних участников.
+
+```plantuml
+@startuml
+!include <C4/C4_Context>
+
+title C4 Context Diagram — Smart Home Ecosystem
+
+Person(user, "Пользователь", "Управляет домом, устройствами и сценариями автоматизации")
+Person(support, "Сотрудник поддержки", "Помогает пользователям с настройкой и проблемами")
+System(system, "Экосистема умного дома", "SaaS-система для управления устройствами дома")
+System_Ext(partnerDevices, "Партнёрские устройства", "Устройства сторонних производителей")
+System_Ext(notificationProvider, "Провайдер уведомлений", "Email, SMS, Push")
+System_Ext(videoDevices, "Камеры видеонаблюдения", "Камеры и видеопотоки")
+
+Rel(user, system, "Использует через web/mobile")
+Rel(support, system, "Работает с обращениями пользователей")
+Rel(system, partnerDevices, "Интегрируется через адаптеры и стандартные протоколы")
+Rel(system, notificationProvider, "Отправляет уведомления")
+Rel(system, videoDevices, "Получает видеопотоки и события")
+
+@enduml
+```
+
+Ссылку на диаграмму можно добавить в README.md так:
 
 ```markdown
-[Посетите Яндекс](https://ya.ru/)
+[Диаграмма контекста C4](./diagrams/c4-context.puml)
 ```
+
+---
 
 # Задание 2. Проектирование микросервисной архитектуры
 
-В этом задании вам нужно предоставить только диаграммы в модели C4. Мы не просим вас отдельно описывать получившиеся микросервисы и то, как вы определили взаимодействия между компонентами To-Be системы. Если вы правильно подготовите диаграммы C4, они и так это покажут.
+В этом задании представлены диаграммы C4 для целевой To-Be архитектуры.
 
-**Диаграмма контейнеров (Containers)**
+## Диаграмма контейнеров Containers
 
-Добавьте диаграмму.
+```plantuml
+@startuml
+!include <C4/C4_Container>
 
-**Диаграмма компонентов (Components)**
+title C4 Container Diagram — Smart Home Ecosystem
 
-Добавьте диаграмму для каждого из выделенных микросервисов.
+Person(user, "Пользователь", "Управляет устройствами дома")
 
-**Диаграмма кода (Code)**
+System_Boundary(system, "Smart Home Ecosystem") {
+    Container(frontend, "Web/Mobile UI", "React / Mobile App", "Пользовательский интерфейс")
+    Container(apiGateway, "API Gateway / BFF", "Go / Node.js", "Единая точка входа для web/mobile клиентов")
 
-Добавьте одну диаграмму или несколько.
+    Container(userService, "User Service", "Go", "Пользователи, роли, доступ")
+    Container(houseService, "House Service", "Go", "Дома, комнаты, зоны")
+    Container(deviceService, "Device Management Service", "Go", "Регистрация устройств, типы, capabilities")
+    Container(commandService, "Device Command Service", "Go", "Отправка команд устройствам")
+    Container(telemetryService, "Telemetry Service", "Go", "Приём и хранение телеметрии")
+    Container(scenarioService, "Scenario Service", "Go", "Сценарии автоматизации")
+    Container(notificationService, "Notification Service", "Go", "Уведомления пользователям")
+    Container(partnerService, "Partner Integration Service", "Go", "Интеграции с партнёрскими устройствами")
+    Container(videoService, "Video Service", "Go", "Видеонаблюдение")
+    Container(catalogService, "Catalog Service", "Go", "Каталог модулей и комплектов")
+
+    ContainerQueue(broker, "Message Broker", "Kafka / RabbitMQ / MQTT", "Команды, события, телеметрия")
+
+    ContainerDb(userDb, "User DB", "PostgreSQL", "Пользователи и роли")
+    ContainerDb(houseDb, "House DB", "PostgreSQL", "Дома и комнаты")
+    ContainerDb(deviceDb, "Device DB", "PostgreSQL", "Устройства, типы, capabilities")
+    ContainerDb(commandDb, "Command DB", "PostgreSQL", "История команд")
+    ContainerDb(telemetryDb, "Telemetry DB", "TimescaleDB / PostgreSQL", "Телеметрия")
+    ContainerDb(scenarioDb, "Scenario DB", "PostgreSQL", "Сценарии")
+    ContainerDb(videoStorage, "Video Storage", "S3 / Object Storage", "Видеоархив и снимки")
+}
+
+System_Ext(devices, "Устройства", "Отопление, свет, ворота, датчики")
+System_Ext(partnerDevices, "Партнёрские устройства", "Устройства сторонних производителей")
+System_Ext(notificationProvider, "Провайдер уведомлений", "Email, SMS, Push")
+
+Rel(user, frontend, "Использует")
+Rel(frontend, apiGateway, "HTTPS/REST")
+
+Rel(apiGateway, userService, "REST")
+Rel(apiGateway, houseService, "REST")
+Rel(apiGateway, deviceService, "REST")
+Rel(apiGateway, commandService, "REST")
+Rel(apiGateway, telemetryService, "REST")
+Rel(apiGateway, scenarioService, "REST")
+Rel(apiGateway, videoService, "REST")
+Rel(apiGateway, catalogService, "REST")
+
+Rel(userService, userDb, "Read/Write")
+Rel(houseService, houseDb, "Read/Write")
+Rel(deviceService, deviceDb, "Read/Write")
+Rel(commandService, commandDb, "Read/Write")
+Rel(telemetryService, telemetryDb, "Read/Write")
+Rel(scenarioService, scenarioDb, "Read/Write")
+Rel(videoService, videoStorage, "Read/Write")
+
+Rel(commandService, broker, "Публикует команды")
+Rel(telemetryService, broker, "Получает телеметрию")
+Rel(scenarioService, broker, "Слушает события телеметрии")
+Rel(notificationService, broker, "Слушает события уведомлений")
+Rel(partnerService, broker, "Публикует и получает события")
+
+Rel(broker, devices, "Команды и телеметрия")
+Rel(partnerService, partnerDevices, "Интеграция")
+Rel(notificationService, notificationProvider, "Отправляет уведомления")
+
+@enduml
+```
+
+---
+
+## Диаграмма компонентов Components
+
+### Device Management Service
+
+```plantuml
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — Device Management Service
+
+Container_Boundary(deviceService, "Device Management Service") {
+    Component(deviceApi, "Device API Controller", "REST Controller", "Принимает запросы на регистрацию и получение устройств")
+    Component(deviceRegistry, "Device Registry", "Service", "Регистрирует устройства")
+    Component(provisioningService, "Provisioning Service", "Service", "Привязывает устройство к дому и комнате")
+    Component(capabilityResolver, "Capability Resolver", "Service", "Определяет возможности устройства")
+    Component(stateManager, "Device State Manager", "Service", "Хранит текущее состояние устройства")
+    Component(deviceRepository, "Device Repository", "Repository", "Работает с БД устройств")
+}
+
+ContainerDb(deviceDb, "Device DB", "PostgreSQL", "Устройства, типы, capabilities")
+
+Rel(deviceApi, deviceRegistry, "Регистрирует устройство")
+Rel(deviceRegistry, provisioningService, "Привязывает устройство")
+Rel(deviceRegistry, capabilityResolver, "Определяет capabilities")
+Rel(deviceRegistry, deviceRepository, "Сохраняет устройство")
+Rel(stateManager, deviceRepository, "Обновляет состояние")
+Rel(deviceRepository, deviceDb, "Read/Write")
+
+@enduml
+```
+
+---
+
+### Device Command Service
+
+```plantuml
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — Device Command Service
+
+Container_Boundary(commandService, "Device Command Service") {
+    Component(commandApi, "Command API Controller", "REST Controller", "Принимает команды от API Gateway")
+    Component(commandValidator, "Command Validator", "Service", "Проверяет, может ли устройство выполнить команду")
+    Component(commandProcessor, "Command Processor", "Service", "Создаёт команду и меняет её статус")
+    Component(commandPublisher, "Command Publisher", "Producer", "Публикует команду в брокер")
+    Component(commandRepository, "Command Repository", "Repository", "Хранит историю команд")
+}
+
+ContainerDb(commandDb, "Command DB", "PostgreSQL", "История команд")
+ContainerQueue(broker, "Message Broker", "Kafka / RabbitMQ / MQTT", "Очередь команд")
+
+Rel(commandApi, commandValidator, "Проверяет команду")
+Rel(commandValidator, commandProcessor, "Передаёт валидную команду")
+Rel(commandProcessor, commandRepository, "Сохраняет команду")
+Rel(commandProcessor, commandPublisher, "Передаёт команду на публикацию")
+Rel(commandPublisher, broker, "Publish DeviceCommandCreated")
+Rel(commandRepository, commandDb, "Read/Write")
+
+@enduml
+```
+
+---
+
+### Telemetry Service
+
+```plantuml
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — Telemetry Service
+
+Container_Boundary(telemetryService, "Telemetry Service") {
+    Component(telemetryApi, "Telemetry API Controller", "REST Controller", "Отдаёт текущую и историческую телеметрию")
+    Component(telemetryConsumer, "Telemetry Consumer", "Consumer", "Получает события телеметрии из брокера")
+    Component(telemetryProcessor, "Telemetry Processor", "Service", "Валидирует и нормализует показания")
+    Component(latestStateService, "Latest State Service", "Service", "Обновляет последнее состояние устройства")
+    Component(telemetryRepository, "Telemetry Repository", "Repository", "Сохраняет телеметрию")
+}
+
+ContainerDb(telemetryDb, "Telemetry DB", "TimescaleDB / PostgreSQL", "Телеметрия")
+ContainerQueue(broker, "Message Broker", "Kafka / RabbitMQ / MQTT", "События телеметрии")
+
+Rel(telemetryConsumer, broker, "Consume TelemetryReceived")
+Rel(telemetryConsumer, telemetryProcessor, "Передаёт показания")
+Rel(telemetryProcessor, telemetryRepository, "Сохраняет историю")
+Rel(telemetryProcessor, latestStateService, "Обновляет последнее значение")
+Rel(telemetryApi, telemetryRepository, "Читает телеметрию")
+Rel(telemetryRepository, telemetryDb, "Read/Write")
+
+@enduml
+```
+
+---
+
+### Scenario Service
+
+```plantuml
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — Scenario Service
+
+Container_Boundary(scenarioService, "Scenario Service") {
+    Component(scenarioApi, "Scenario API Controller", "REST Controller", "Создание и управление сценариями")
+    Component(scenarioManager, "Scenario Manager", "Service", "Создаёт, обновляет и отключает сценарии")
+    Component(conditionEvaluator, "Condition Evaluator", "Service", "Проверяет выполнение условий")
+    Component(actionExecutor, "Action Executor", "Service", "Запускает действия сценария")
+    Component(eventConsumer, "Telemetry Event Consumer", "Consumer", "Получает события телеметрии")
+    Component(commandProducer, "Command Producer", "Producer", "Публикует команды устройствам")
+    Component(scenarioRepository, "Scenario Repository", "Repository", "Хранит сценарии")
+}
+
+ContainerDb(scenarioDb, "Scenario DB", "PostgreSQL", "Сценарии")
+ContainerQueue(broker, "Message Broker", "Kafka / RabbitMQ / MQTT", "События и команды")
+
+Rel(scenarioApi, scenarioManager, "Создаёт сценарий")
+Rel(scenarioManager, scenarioRepository, "Сохраняет сценарий")
+Rel(eventConsumer, broker, "Consume TelemetryChanged")
+Rel(eventConsumer, conditionEvaluator, "Передаёт событие")
+Rel(conditionEvaluator, scenarioRepository, "Получает активные сценарии")
+Rel(conditionEvaluator, actionExecutor, "Условие выполнено")
+Rel(actionExecutor, commandProducer, "Создаёт команду")
+Rel(commandProducer, broker, "Publish DeviceCommandCreated")
+Rel(scenarioRepository, scenarioDb, "Read/Write")
+
+@enduml
+```
+
+---
+
+### Notification Service
+
+```plantuml
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — Notification Service
+
+Container_Boundary(notificationService, "Notification Service") {
+    Component(notificationConsumer, "Notification Event Consumer", "Consumer", "Получает события для уведомлений")
+    Component(templateService, "Template Service", "Service", "Формирует текст уведомления")
+    Component(notificationSender, "Notification Sender", "Service", "Отправляет уведомление")
+    Component(notificationRepository, "Notification Repository", "Repository", "Хранит историю уведомлений")
+}
+
+ContainerQueue(broker, "Message Broker", "Kafka / RabbitMQ", "События")
+ContainerDb(notificationDb, "Notification DB", "PostgreSQL", "История уведомлений")
+System_Ext(provider, "Notification Provider", "Email/SMS/Push")
+
+Rel(notificationConsumer, broker, "Consume NotificationRequested")
+Rel(notificationConsumer, templateService, "Передаёт событие")
+Rel(templateService, notificationSender, "Формирует сообщение")
+Rel(notificationSender, provider, "Отправляет уведомление")
+Rel(notificationSender, notificationRepository, "Сохраняет статус")
+Rel(notificationRepository, notificationDb, "Read/Write")
+
+@enduml
+```
+
+---
+
+## Диаграмма кода Code
+
+### Сценарий: пользователь отправляет команду устройству
+
+```plantuml
+@startuml
+title Sequence Diagram — Отправка команды устройству
+
+actor User as user
+participant "Web/Mobile UI" as ui
+participant "API Gateway" as gateway
+participant "Device Command Service" as command
+queue "Message Broker" as broker
+participant "Device Adapter" as adapter
+participant "Device" as device
+participant "Telemetry Service" as telemetry
+
+user -> ui: Нажимает "Включить отопление"
+ui -> gateway: POST /devices/{id}/commands
+gateway -> command: Передаёт команду
+command -> command: Валидирует устройство и команду
+command -> broker: Publish DeviceCommandCreated
+command --> gateway: 202 Accepted
+gateway --> ui: Команда принята
+
+broker -> adapter: DeviceCommandCreated
+adapter -> device: Отправить команду turn_on
+device --> adapter: OK
+adapter -> broker: DeviceStateChanged
+
+broker -> telemetry: DeviceStateChanged
+telemetry -> telemetry: Сохраняет новое состояние
+
+@enduml
+```
+
+---
+
+### Сценарий: устройство отправляет телеметрию
+
+```plantuml
+@startuml
+title Sequence Diagram — Получение телеметрии от устройства
+
+participant "Device" as device
+participant "Device Adapter" as adapter
+queue "Message Broker" as broker
+participant "Telemetry Service" as telemetry
+participant "Scenario Service" as scenario
+participant "Notification Service" as notification
+
+device -> adapter: Передаёт температуру
+adapter -> broker: Publish TelemetryReceived
+broker -> telemetry: TelemetryReceived
+telemetry -> telemetry: Сохраняет показание
+telemetry -> broker: Publish TelemetryChanged
+
+broker -> scenario: TelemetryChanged
+scenario -> scenario: Проверяет условия сценариев
+
+alt Условие сценария выполнено
+    scenario -> broker: Publish DeviceCommandCreated
+end
+
+alt Требуется уведомление
+    scenario -> broker: Publish NotificationRequested
+    broker -> notification: NotificationRequested
+    notification -> notification: Отправляет уведомление пользователю
+end
+
+@enduml
+```
+
+---
 
 # Задание 3. Разработка ER-диаграммы
 
-Добавьте сюда ER-диаграмму. Она должна отражать ключевые сущности системы, их атрибуты и тип связей между ними.
+ER-диаграмма отражает ключевые сущности системы, их атрибуты и типы связей.
+
+```plantuml
+@startuml
+title ER Diagram — Smart Home Ecosystem
+
+entity "User" as users {
+  * id : uuid
+  --
+  name : varchar
+  email : varchar
+  password_hash : varchar
+  created_at : timestamp
+}
+
+entity "House" as houses {
+  * id : uuid
+  --
+  user_id : uuid
+  name : varchar
+  address : varchar
+  created_at : timestamp
+}
+
+entity "Room" as rooms {
+  * id : uuid
+  --
+  house_id : uuid
+  name : varchar
+}
+
+entity "Vendor" as vendors {
+  * id : uuid
+  --
+  name : varchar
+  integration_type : varchar
+}
+
+entity "DeviceModel" as device_models {
+  * id : uuid
+  --
+  vendor_id : uuid
+  device_type_id : uuid
+  name : varchar
+  protocol : varchar
+}
+
+entity "DeviceType" as device_types {
+  * id : uuid
+  --
+  code : varchar
+  name : varchar
+  description : text
+}
+
+entity "Capability" as capabilities {
+  * id : uuid
+  --
+  code : varchar
+  name : varchar
+  params_schema : jsonb
+}
+
+entity "DeviceTypeCapability" as device_type_capabilities {
+  * device_type_id : uuid
+  * capability_id : uuid
+}
+
+entity "Device" as devices {
+  * id : uuid
+  --
+  house_id : uuid
+  room_id : uuid
+  device_type_id : uuid
+  model_id : uuid
+  serial_number : varchar
+  status : varchar
+  is_online : boolean
+  created_at : timestamp
+}
+
+entity "DeviceState" as device_states {
+  * id : uuid
+  --
+  device_id : uuid
+  state : jsonb
+  updated_at : timestamp
+}
+
+entity "TelemetryData" as telemetry {
+  * id : uuid
+  --
+  device_id : uuid
+  metric : varchar
+  value : decimal
+  unit : varchar
+  created_at : timestamp
+}
+
+entity "Command" as commands {
+  * id : uuid
+  --
+  device_id : uuid
+  capability_code : varchar
+  params : jsonb
+  status : varchar
+  created_at : timestamp
+  executed_at : timestamp
+}
+
+entity "Scenario" as scenarios {
+  * id : uuid
+  --
+  user_id : uuid
+  house_id : uuid
+  name : varchar
+  is_active : boolean
+  created_at : timestamp
+}
+
+entity "ScenarioCondition" as scenario_conditions {
+  * id : uuid
+  --
+  scenario_id : uuid
+  device_id : uuid
+  metric : varchar
+  operator : varchar
+  value : varchar
+}
+
+entity "ScenarioAction" as scenario_actions {
+  * id : uuid
+  --
+  scenario_id : uuid
+  device_id : uuid
+  capability_code : varchar
+  params : jsonb
+}
+
+entity "ModuleKit" as module_kits {
+  * id : uuid
+  --
+  name : varchar
+  description : text
+  price : decimal
+}
+
+users ||--o{ houses
+houses ||--o{ rooms
+houses ||--o{ devices
+rooms ||--o{ devices
+
+vendors ||--o{ device_models
+device_types ||--o{ device_models
+device_models ||--o{ devices
+device_types ||--o{ devices
+
+device_types ||--o{ device_type_capabilities
+capabilities ||--o{ device_type_capabilities
+
+devices ||--o{ telemetry
+devices ||--o{ commands
+devices ||--o{ device_states
+
+users ||--o{ scenarios
+houses ||--o{ scenarios
+scenarios ||--o{ scenario_conditions
+scenarios ||--o{ scenario_actions
+devices ||--o{ scenario_conditions
+devices ||--o{ scenario_actions
+
+@enduml
+```
+
+Описание ключевых связей:
+
+* Один пользователь может иметь несколько домов.
+* В одном доме может быть несколько комнат.
+* В одном доме может быть несколько устройств.
+* Устройство может быть привязано к комнате.
+* Устройство имеет тип.
+* Тип устройства определяет набор возможностей.
+* Устройство может отправлять много телеметрических показаний.
+* Для устройства может быть создано много команд.
+* Пользователь может создавать сценарии автоматизации.
+* Сценарий состоит из условий и действий.
+* Условие сценария может быть связано с конкретным устройством.
+* Действие сценария выполняет команду над конкретным устройством.
+
+---
 
 # Задание 4. Создание и документирование API
 
-### 1. Тип API
+## 1. Тип API
 
-Укажите, какой тип API вы будете использовать для взаимодействия микросервисов. Объясните своё решение.
+Для взаимодействия между frontend/mobile-приложением и backend-сервисами будет использоваться **REST API**.
 
-### 2. Документация API
+Причины выбора REST API:
 
-Здесь приложите ссылки на документацию API для микросервисов, которые вы спроектировали в первой части проектной работы. Для документирования используйте Swagger/OpenAPI или AsyncAPI.
+* REST хорошо подходит для пользовательских операций: создать устройство, получить список устройств, создать сценарий.
+* REST легко документировать через Swagger/OpenAPI.
+* REST удобно тестировать через Postman.
+* REST понятен frontend-разработчикам.
+* REST хорошо подходит для синхронных запросов пользователя.
+
+Для асинхронного взаимодействия между микросервисами будет использоваться **event-driven API через брокер сообщений**.
+
+Для этого подходят Kafka, RabbitMQ или MQTT.
+
+Асинхронное взаимодействие нужно для:
+
+* отправки команд устройствам;
+* получения телеметрии;
+* обработки событий изменения состояния;
+* запуска сценариев автоматизации;
+* отправки уведомлений.
+
+Итоговое решение:
+
+```text
+REST/OpenAPI — для внешнего API и синхронных запросов.
+AsyncAPI + Message Broker — для событий, команд и телеметрии.
+```
+
+---
+
+## 2. Документация API
+
+Документацию REST API можно оформить в Swagger/OpenAPI.
+
+Файл:
+
+```text
+docs/openapi.yaml
+```
+
+Пример OpenAPI-документации:
+
+```yaml
+openapi: 3.0.3
+info:
+  title: Smart Home API
+  version: 1.0.0
+  description: API для SaaS-платформы умного дома
+
+paths:
+  /api/v1/devices:
+    post:
+      summary: Register device
+      description: Регистрация нового устройства пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - house_id
+                - serial_number
+                - device_type
+              properties:
+                house_id:
+                  type: string
+                  example: house-123
+                room_id:
+                  type: string
+                  example: room-1
+                serial_number:
+                  type: string
+                  example: SN-001
+                device_type:
+                  type: string
+                  example: heater
+                vendor:
+                  type: string
+                  example: warmhouse
+                model:
+                  type: string
+                  example: heater-basic-v1
+      responses:
+        "201":
+          description: Device registered
+        "400":
+          description: Bad request
+        "404":
+          description: House or room not found
+        "409":
+          description: Device already registered
+
+  /api/v1/houses/{house_id}/devices:
+    get:
+      summary: Get house devices
+      description: Получение списка устройств дома
+      parameters:
+        - name: house_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: house-123
+      responses:
+        "200":
+          description: Device list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    room_id:
+                      type: string
+                    serial_number:
+                      type: string
+                    capabilities:
+                      type: array
+                      items:
+                        type: string
+        "404":
+          description: House not found
+
+  /api/v1/devices/{device_id}/commands:
+    post:
+      summary: Send command to device
+      description: Отправка команды устройству
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: device-123
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - command
+              properties:
+                command:
+                  type: string
+                  example: turn_on
+                params:
+                  type: object
+                  example:
+                    target_temperature: 23
+      responses:
+        "202":
+          description: Command accepted
+        "400":
+          description: Invalid command
+        "404":
+          description: Device not found
+        "409":
+          description: Command cannot be executed in current state
+
+  /api/v1/devices/{device_id}/telemetry/latest:
+    get:
+      summary: Get latest telemetry
+      description: Получение последней телеметрии устройства
+      parameters:
+        - name: device_id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: device-123
+      responses:
+        "200":
+          description: Latest telemetry
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  device_id:
+                    type: string
+                  metrics:
+                    type: object
+                    example:
+                      temperature: 21.5
+                      humidity: 40
+                  timestamp:
+                    type: string
+                    format: date-time
+        "404":
+          description: Telemetry not found
+
+  /api/v1/scenarios:
+    post:
+      summary: Create automation scenario
+      description: Создание сценария автоматизации
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - house_id
+                - conditions
+                - actions
+              properties:
+                name:
+                  type: string
+                  example: Turn on heating when cold
+                house_id:
+                  type: string
+                  example: house-123
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      device_id:
+                        type: string
+                      metric:
+                        type: string
+                      operator:
+                        type: string
+                      value:
+                        type: string
+                actions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      device_id:
+                        type: string
+                      command:
+                        type: string
+                      params:
+                        type: object
+      responses:
+        "201":
+          description: Scenario created
+        "400":
+          description: Invalid scenario
+        "404":
+          description: House or device not found
+```
+
+Ссылка на документацию API в README.md:
+
+```markdown
+[OpenAPI-документация](./docs/openapi.yaml)
+```
+
+Для асинхронного API можно добавить AsyncAPI.
+
+Файл:
+
+```text
+docs/asyncapi.yaml
+```
+
+Пример:
+
+```yaml
+asyncapi: 2.6.0
+info:
+  title: Smart Home Async API
+  version: 1.0.0
+  description: Асинхронные события для команд, телеметрии и сценариев
+
+channels:
+  device.commands:
+    publish:
+      summary: Команда устройству
+      message:
+        name: DeviceCommandCreated
+        payload:
+          type: object
+          properties:
+            command_id:
+              type: string
+            device_id:
+              type: string
+            command:
+              type: string
+            params:
+              type: object
+            created_at:
+              type: string
+              format: date-time
+
+  device.telemetry:
+    subscribe:
+      summary: Телеметрия от устройства
+      message:
+        name: TelemetryReceived
+        payload:
+          type: object
+          properties:
+            device_id:
+              type: string
+            metric:
+              type: string
+            value:
+              type: number
+            unit:
+              type: string
+            created_at:
+              type: string
+              format: date-time
+
+  notifications:
+    publish:
+      summary: Запрос на отправку уведомления
+      message:
+        name: NotificationRequested
+        payload:
+          type: object
+          properties:
+            user_id:
+              type: string
+            type:
+              type: string
+            message:
+              type: string
+            channel:
+              type: string
+```
+
+Ссылка на AsyncAPI в README.md:
+
+```markdown
+[AsyncAPI-документация](./docs/asyncapi.yaml)
+```
+
+---
 
 # Задание 5. Работа с docker и docker-compose
 
-Перейдите в apps.
+Перейдите в `apps`.
 
-Там находится приложение-монолит для работы с датчиками температуры. В README.md описано как запустить решение.
+Там находится приложение-монолит для работы с датчиками температуры. В `README.md` описано, как запустить решение.
 
-Вам нужно:
+Нужно добавить отдельное приложение `temperature-api`, упаковать его в Docker и добавить в `docker-compose`.
 
-1) сделать простое приложение temperature-api на любом удобном для вас языке программирования, которое при запросе /temperature?location= будет отдавать рандомное значение температуры.
+Порт по умолчанию должен быть `8081`.
 
-Locations - название комнаты, sensorId - идентификатор названия комнаты
+---
 
+## 1. Приложение temperature-api
+
+Приложение реализовано на Go.
+
+Структура файлов:
+
+```text
+apps/
+  temperature-api/
+    main.go
+    go.mod
+    Dockerfile
+
+  smart_home/
+    init.sql
+
+  docker-compose.yml
 ```
+
+---
+
+## temperature-api/go.mod
+
+```go
+module temperature-api
+
+go 1.22
+```
+
+---
+
+## temperature-api/main.go
+
+```go
+package main
+
+import (
+	"encoding/json"
+	"log"
+	"math/rand"
+	"net/http"
+	"time"
+)
+
+type TemperatureResponse struct {
+	Location    string  `json:"location"`
+	SensorID    string  `json:"sensorId"`
+	Temperature float64 `json:"temperature"`
+	Unit        string  `json:"unit"`
+	Timestamp   string  `json:"timestamp"`
+}
+
+func main() {
+	rand.Seed(time.Now().UnixNano())
+
+	http.HandleFunc("/temperature", temperatureHandler)
+
+	log.Println("temperature-api started on port 8081")
+	if err := http.ListenAndServe(":8081", nil); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func temperatureHandler(w http.ResponseWriter, r *http.Request) {
+	location := r.URL.Query().Get("location")
+	sensorID := r.URL.Query().Get("sensorId")
+
 	// If no location is provided, use a default based on sensor ID
 	if location == "" {
 		switch sensorID {
@@ -126,19 +1315,262 @@ Locations - название комнаты, sensorId - идентификато
 			sensorID = "0"
 		}
 	}
+
+	temperature := 18 + rand.Float64()*10
+
+	response := TemperatureResponse{
+		Location:    location,
+		SensorID:    sensorID,
+		Temperature: round(temperature, 2),
+		Unit:        "celsius",
+		Timestamp:   time.Now().UTC().Format(time.RFC3339),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func round(value float64, precision int) float64 {
+	multiplier := 1.0
+	for i := 0; i < precision; i++ {
+		multiplier *= 10
+	}
+
+	return float64(int(value*multiplier+0.5)) / multiplier
+}
 ```
 
-2) Приложение следует упаковать в Docker и добавить в docker-compose. Порт по умолчанию должен быть 8081
+---
 
-3) Кроме того для smart_home приложения требуется база данных - добавьте в docker-compose файл настройки для запуска postgres с указанием скрипта инициализации ./smart_home/init.sql
+## temperature-api/Dockerfile
 
-Для проверки можно использовать Postman коллекцию smarthome-api.postman_collection.json и вызвать:
+```dockerfile
+FROM golang:1.22-alpine AS builder
 
-- Create Sensor
-- Get All Sensors
+WORKDIR /app
 
-Должно при каждом вызове отображаться разное значение температуры
+COPY go.mod ./
+COPY main.go ./
 
-Ревьюер будет проверять точно так же.
+RUN go build -o temperature-api .
 
+FROM alpine:3.20
 
+WORKDIR /app
+
+COPY --from=builder /app/temperature-api .
+
+EXPOSE 8081
+
+CMD ["./temperature-api"]
+```
+
+---
+
+## 2. Добавление temperature-api в docker-compose
+
+Пример `docker-compose.yml`:
+
+```yaml
+services:
+  temperature-api:
+    build:
+      context: ./temperature-api
+    container_name: temperature-api
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    container_name: smart-home-postgres
+    environment:
+      POSTGRES_DB: smart_home
+      POSTGRES_USER: smart_home
+      POSTGRES_PASSWORD: smart_home
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./smart_home/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+  smart_home:
+    build:
+      context: ./smart_home
+    container_name: smart-home
+    depends_on:
+      - postgres
+      - temperature-api
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: smart_home
+      DB_USER: smart_home
+      DB_PASSWORD: smart_home
+      TEMPERATURE_API_URL: http://temperature-api:8081
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+```
+
+Если в исходном `docker-compose.yml` сервис `smart_home` уже есть, нужно не переписывать его полностью, а добавить:
+
+```yaml
+depends_on:
+  - postgres
+  - temperature-api
+```
+
+и переменную окружения, если приложение её поддерживает:
+
+```yaml
+TEMPERATURE_API_URL: http://temperature-api:8081
+```
+
+---
+
+## 3. Добавление PostgreSQL для smart_home
+
+Для приложения `smart_home` требуется база данных PostgreSQL.
+
+В `docker-compose.yml` добавлен сервис:
+
+```yaml
+postgres:
+  image: postgres:16
+  container_name: smart-home-postgres
+  environment:
+    POSTGRES_DB: smart_home
+    POSTGRES_USER: smart_home
+    POSTGRES_PASSWORD: smart_home
+  ports:
+    - "5432:5432"
+  volumes:
+    - ./smart_home/init.sql:/docker-entrypoint-initdb.d/init.sql
+  restart: unless-stopped
+```
+
+Инициализация базы выполняется скриптом:
+
+```text
+./smart_home/init.sql
+```
+
+---
+
+## 4. Проверка temperature-api
+
+Запуск:
+
+```bash
+docker compose up --build
+```
+
+Проверка через curl:
+
+```bash
+curl "http://localhost:8081/temperature?location=Living%20Room"
+```
+
+Пример ответа:
+
+```json
+{
+  "location": "Living Room",
+  "sensorId": "1",
+  "temperature": 23.47,
+  "unit": "celsius",
+  "timestamp": "2026-07-01T12:00:00Z"
+}
+```
+
+Проверка по sensorId:
+
+```bash
+curl "http://localhost:8081/temperature?sensorId=2"
+```
+
+Пример ответа:
+
+```json
+{
+  "location": "Bedroom",
+  "sensorId": "2",
+  "temperature": 20.14,
+  "unit": "celsius",
+  "timestamp": "2026-07-01T12:00:05Z"
+}
+```
+
+Если не передать ни `location`, ни `sensorId`:
+
+```bash
+curl "http://localhost:8081/temperature"
+```
+
+Пример ответа:
+
+```json
+{
+  "location": "Unknown",
+  "sensorId": "0",
+  "temperature": 26.03,
+  "unit": "celsius",
+  "timestamp": "2026-07-01T12:00:10Z"
+}
+```
+
+При каждом новом вызове значение `temperature` будет отличаться.
+
+---
+
+## 5. Проверка через Postman
+
+Для проверки можно использовать коллекцию:
+
+```text
+smarthome-api.postman_collection.json
+```
+
+Нужно вызвать:
+
+```text
+Create Sensor
+Get All Sensors
+```
+
+Ожидаемый результат:
+
+* датчик создаётся успешно;
+* список датчиков возвращается успешно;
+* при каждом вызове отображается разное значение температуры;
+* приложение `temperature-api` доступно на порту `8081`;
+* база данных PostgreSQL запускается через docker-compose;
+* база инициализируется скриптом `./smart_home/init.sql`.
+
+---
+
+## 6. Итог по заданию 5
+
+В результате выполнено:
+
+* создано приложение `temperature-api`;
+* реализован endpoint:
+
+```http
+GET /temperature?location=
+```
+
+* поддержан параметр `sensorId`;
+* реализована логика определения `location` по `sensorId`;
+* реализована логика определения `sensorId` по `location`;
+* температура генерируется случайно при каждом запросе;
+* приложение упаковано в Docker;
+* приложение добавлено в docker-compose;
+* порт по умолчанию — `8081`;
+* добавлен PostgreSQL для `smart_home`;
+* подключён init-скрипт `./smart_home/init.sql`.
