@@ -394,30 +394,6 @@ PostgreSQL
 
 Диаграмма контекста показывает систему целиком и внешних участников.
 
-```plantuml
-@startuml
-!include <C4/C4_Context>
-
-title C4 Context Diagram — Smart Home Ecosystem
-
-Person(user, "Пользователь", "Управляет домом, устройствами и сценариями автоматизации")
-Person(support, "Сотрудник поддержки", "Помогает пользователям с настройкой и проблемами")
-System(system, "Экосистема умного дома", "SaaS-система для управления устройствами дома")
-System_Ext(partnerDevices, "Партнёрские устройства", "Устройства сторонних производителей")
-System_Ext(notificationProvider, "Провайдер уведомлений", "Email, SMS, Push")
-System_Ext(videoDevices, "Камеры видеонаблюдения", "Камеры и видеопотоки")
-
-Rel(user, system, "Использует через web/mobile")
-Rel(support, system, "Работает с обращениями пользователей")
-Rel(system, partnerDevices, "Интегрируется через адаптеры и стандартные протоколы")
-Rel(system, notificationProvider, "Отправляет уведомления")
-Rel(system, videoDevices, "Получает видеопотоки и события")
-
-@enduml
-```
-
-Ссылку на диаграмму можно добавить в README.md так:
-
 ```markdown
 [Диаграмма контекста C4](./diagrams/c4-context.puml)
 ```
