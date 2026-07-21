@@ -1,0 +1,46 @@
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram - Scenario Service
+
+Container_Boundary(scenarioService, "Scenario Service") {
+    Component(scenarioApi, "Scenario API", "REST Controller", "Принимает запросы на создание, изменение, включение, выключение и просмотр сценариев автоматизации")
+
+    Component(scenarioManagement, "Scenario Management Component", "Application Service", "Создаёт, изменяет, включает, выключает и удаляет сценарии, их условия и действия")
+
+    Component(eventListener, "Scenario Event Listener", "Kafka Consumer", "Получает события телеметрии и изменения состояния устройств из брокера сообщений")
+
+    Component(scenarioExecution, "Scenario Execution Component", "Application Service", "Находит подходящие сценарии, проверяет условия, формирует действия и сохраняет результаты выполнения")
+
+    Component(commandProducer, "Command Producer", "REST Adapter", "Преобразует действия сценария в команды и передаёт их в Device Command Service")
+
+    Component(scenarioRepository, "Scenario Repository", "Repository", "Читает и сохраняет сценарии, условия, действия и историю выполнения")
+}
+
+Container(apiGateway, "API Gateway / BFF", "Go", "Единая точка входа для клиентских приложений")
+
+ContainerQueue(messageBroker, "Message Broker", "Kafka", "Передаёт события телеметрии и изменения состояния устройств")
+
+Container(commandService, "Device Command Service", "Go", "Проверяет, сохраняет и отправляет команды устройствам")
+
+ContainerDb(scenarioDb, "Scenario DB", "PostgreSQL", "Хранит сценарии, условия, действия и историю выполнения")
+
+Rel(apiGateway, scenarioApi, "Передаёт запросы управления сценариями", "REST / HTTPS")
+
+Rel(scenarioApi, scenarioManagement, "Передаёт запросы создания и изменения сценариев")
+
+Rel(scenarioManagement, scenarioRepository, "Читает и сохраняет сценарии")
+
+Rel(messageBroker, eventListener, "Передаёт события устройств и телеметрии", "Kafka")
+
+Rel(eventListener, scenarioExecution, "Передаёт событие для обработки")
+
+Rel(scenarioExecution, scenarioRepository, "Загружает сценарии и сохраняет результаты выполнения")
+
+Rel(scenarioExecution, commandProducer, "Передаёт действия сработавшего сценария")
+
+Rel(commandProducer, commandService, "Создаёт команды устройствам", "REST / HTTPS")
+
+Rel(scenarioRepository, scenarioDb, "Читает и сохраняет данные", "SQL")
+
+@enduml

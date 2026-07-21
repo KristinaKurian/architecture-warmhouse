@@ -1,0 +1,631 @@
+openapi: 3.1.1
+info:
+  title: Device Management Service API
+  version: 1.1.0
+  description: Регистрация и жизненный цикл устройств, привязки к дому, метаданные, capabilities и статусы доступности.
+servers:
+- url: https://api.smart-home.example.com/devices/v1
+  description: Доступ через API Gateway
+- url: http://devices:8080/v1
+  description: Внутренний адрес сервиса
+security:
+- bearerAuth: []
+tags:
+- name: Devices
+- name: Bindings
+- name: Status
+- name: Models
+- name: Manufacturers
+- name: Capabilities
+paths:
+  /devices:
+    get:
+      tags:
+      - Devices
+      summary: Список устройств пользователя
+      parameters:
+      - name: houseId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      - name: status
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Список устройств
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Device'
+    post:
+      tags:
+      - Devices
+      summary: Зарегистрировать устройство
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceRequest'
+      responses:
+        '201':
+          description: Устройство зарегистрировано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /devices/{deviceId}:
+    parameters:
+    - name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Devices
+      summary: Получить устройство
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Devices
+      summary: Изменить устройство
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDeviceRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+    delete:
+      tags:
+      - Devices
+      summary: Удалить устройство
+      responses:
+        '204':
+          description: Устройство удалено
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /devices/{deviceId}/bindings:
+    parameters:
+    - name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      tags:
+      - Bindings
+      summary: Привязать устройство к дому или помещению
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BindDeviceRequest'
+      responses:
+        '201':
+          description: Привязка создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceBinding'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    get:
+      tags:
+      - Bindings
+      summary: Получить историю привязок устройства
+      responses:
+        '200':
+          description: История привязок
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeviceBinding'
+  /devices/{deviceId}/capabilities:
+    parameters:
+    - name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Capabilities
+      summary: Получить возможности устройства
+      responses:
+        '200':
+          description: Capabilities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Capability'
+  /devices/{deviceId}/bindings/{bindingId}:
+    parameters:
+    - name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: bindingId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    delete:
+      tags:
+      - Bindings
+      summary: Отвязать устройство от дома или помещения
+      responses:
+        '204':
+          description: Привязка завершена
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /devices/{deviceId}/status:
+    parameters:
+    - name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Status
+      summary: Получить статус устройства
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Status
+      summary: Обновить статус устройства
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDeviceStatusRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /device-models:
+    get:
+      tags:
+      - Models
+      summary: Получить модели устройств
+      parameters:
+      - name: manufacturerId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: deviceType
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Модели устройств
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeviceModel'
+  /device-models/{modelId}:
+    parameters:
+    - name: modelId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Models
+      summary: Получить модель устройства
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceModel'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /manufacturers:
+    get:
+      tags:
+      - Manufacturers
+      summary: Получить производителей устройств
+      responses:
+        '200':
+          description: Производители
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Manufacturer'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Некорректные параметры запроса
+        details:
+          type: object
+          additionalProperties: true
+        traceId:
+          type: string
+          example: 01J0TRACEIDEXAMPLE
+    PageInfo:
+      type: object
+      required:
+      - limit
+      - offset
+      - total
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        offset:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+    Capability:
+      type: object
+      required:
+      - code
+      - name
+      - valueType
+      properties:
+        code:
+          type: string
+          example: temperature.set
+        name:
+          type: string
+        valueType:
+          type: string
+          enum:
+          - boolean
+          - integer
+          - decimal
+          - string
+          - object
+        unit:
+          type:
+          - string
+          - 'null'
+          example: celsius
+        configuration:
+          type: object
+          additionalProperties: true
+    Device:
+      type: object
+      required:
+      - id
+      - modelId
+      - serialNumber
+      - status
+      - registeredAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        modelId:
+          type: string
+          format: uuid
+        serialNumber:
+          type: string
+        status:
+          type: string
+          enum:
+          - ONLINE
+          - OFFLINE
+          - UNAVAILABLE
+          - PAIRING
+        registeredAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Capability'
+        displayName:
+          type:
+          - string
+          - 'null'
+        currentBinding:
+          oneOf:
+          - $ref: '#/components/schemas/DeviceBinding'
+          - type: 'null'
+        updatedAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+    RegisterDeviceRequest:
+      type: object
+      required:
+      - serialNumber
+      - modelId
+      - pairingToken
+      properties:
+        serialNumber:
+          type: string
+        modelId:
+          type: string
+          format: uuid
+        pairingToken:
+          type: string
+    UpdateDeviceRequest:
+      type: object
+      properties:
+        displayName:
+          type:
+          - string
+          - 'null'
+        status:
+          type: string
+          enum:
+          - ONLINE
+          - OFFLINE
+          - UNAVAILABLE
+    BindDeviceRequest:
+      type: object
+      required:
+      - houseId
+      properties:
+        houseId:
+          type: string
+          format: uuid
+        roomId:
+          oneOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+        zoneId:
+          oneOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+    DeviceBinding:
+      type: object
+      required:
+      - id
+      - deviceId
+      - houseId
+      - boundAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        houseId:
+          type: string
+          format: uuid
+        roomId:
+          oneOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+        zoneId:
+          oneOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+        boundAt:
+          type: string
+          format: date-time
+        unboundAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+    DeviceStatus:
+      type: object
+      required:
+      - deviceId
+      - status
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - ONLINE
+          - OFFLINE
+          - UNAVAILABLE
+          - PAIRING
+        lastSeenAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        updatedAt:
+          type: string
+          format: date-time
+    UpdateDeviceStatusRequest:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - ONLINE
+          - OFFLINE
+          - UNAVAILABLE
+        lastSeenAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+    Manufacturer:
+      type: object
+      required:
+      - id
+      - name
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        website:
+          type:
+          - string
+          - 'null'
+          format: uri
+    DeviceModel:
+      type: object
+      required:
+      - id
+      - manufacturerId
+      - name
+      - deviceType
+      - protocol
+      - capabilities
+      properties:
+        id:
+          type: string
+          format: uuid
+        manufacturerId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        deviceType:
+          type: string
+        protocol:
+          type: string
+        firmwareVersion:
+          type:
+          - string
+          - 'null'
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Capability'
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Требуется аутентификация
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Недостаточно прав
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Конфликт состояния ресурса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0

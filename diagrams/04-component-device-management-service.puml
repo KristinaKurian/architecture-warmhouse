@@ -1,0 +1,46 @@
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — Device Management Service
+
+Container_Boundary(deviceService, "Device Management Service") {
+    Component(deviceApi, "Device API", "REST Controller", "Принимает запросы на регистрацию, настройку, привязку, получение и удаление устройств")
+
+    Component(deviceLifecycleComponent, "Device Lifecycle Component", "Application Service", "Регистрирует устройства, привязывает их к дому, комнате или зоне, изменяет привязку и выполняет отвязку")
+
+    Component(deviceMetadataComponent, "Device Metadata Component", "Application Service", "Предоставляет информацию о типах, моделях, производителях и возможностях устройств")
+
+    Component(deviceStatusComponent, "Device Status Component", "Application Service", "Обновляет и предоставляет статус устройства: online, offline, unavailable и время последней активности")
+
+    Component(deviceRepository, "Device Repository", "Repository", "Читает и сохраняет устройства, их привязки, метаданные и статусы")
+}
+
+Container(apiGateway, "API Gateway / BFF", "Go", "Единая точка входа для клиентских приложений")
+
+ContainerDb(deviceDb, "Device DB", "PostgreSQL", "Хранит устройства, модели, производителей, capabilities, привязки и статусы")
+
+Container(houseService, "House Service", "Go", "Предоставляет информацию о домах, помещениях и зонах")
+
+Container(partnerService, "Partner Integration Service", "Go", "Обеспечивает подключение устройств через внешние протоколы и адаптеры")
+
+Rel(apiGateway, deviceApi, "Передаёт запросы управления устройствами", "REST / HTTPS")
+
+Rel(deviceApi, deviceLifecycleComponent, "Передаёт запросы регистрации, привязки, отвязки и удаления устройств")
+
+Rel(deviceApi, deviceMetadataComponent, "Запрашивает типы, модели и возможности устройств")
+
+Rel(deviceApi, deviceStatusComponent, "Запрашивает и изменяет статус устройства")
+
+Rel(deviceLifecycleComponent, deviceRepository, "Читает и сохраняет устройства и их привязки")
+
+Rel(deviceMetadataComponent, deviceRepository, "Читает модели, производителей и capabilities")
+
+Rel(deviceStatusComponent, deviceRepository, "Читает и обновляет статус устройства")
+
+Rel(deviceLifecycleComponent, houseService, "Проверяет существование дома, комнаты или зоны", "REST")
+
+Rel(deviceLifecycleComponent, partnerService, "Инициирует подключение и проверяет внешний адаптер", "REST")
+
+Rel(deviceRepository, deviceDb, "Читает и сохраняет данные", "SQL")
+
+@enduml

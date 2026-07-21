@@ -1,0 +1,32 @@
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram - Catalog Service
+
+Container_Boundary(catalogService, "Catalog Service") {
+    Component(catalogApi, "Catalog API", "REST Controller", "Предоставляет каталог устройств, модулей и комплектов, а также информацию об их совместимости")
+
+    Component(catalogManagement, "Catalog Management Component", "Application Service", "Управляет устройствами, модулями и комплектами, их описаниями, составом, статусом публикации и параметрами подключения")
+
+    Component(compatibilityComponent, "Compatibility Component", "Application Service", "Определяет совместимость устройств и модулей, а также обязательные и несовместимые элементы")
+
+    Component(catalogRepository, "Catalog Repository", "Repository", "Читает и сохраняет элементы каталога, комплекты, состав комплектов и правила совместимости")
+}
+
+Container(apiGateway, "API Gateway / BFF", "Go", "Единая точка входа для клиентских приложений")
+
+ContainerDb(catalogDb, "Catalog DB", "PostgreSQL", "Хранит устройства, модули, комплекты, состав комплектов и правила совместимости")
+
+Rel(apiGateway, catalogApi, "Запрашивает каталог и совместимость", "REST / HTTPS")
+
+Rel(catalogApi, catalogManagement, "Передаёт запросы получения и управления каталогом")
+
+Rel(catalogApi, compatibilityComponent, "Передаёт запросы проверки совместимости")
+
+Rel(catalogManagement, catalogRepository, "Читает и сохраняет элементы и комплекты")
+
+Rel(compatibilityComponent, catalogRepository, "Читает и сохраняет правила совместимости")
+
+Rel(catalogRepository, catalogDb, "Читает и сохраняет данные", "SQL")
+
+@enduml

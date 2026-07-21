@@ -1,0 +1,79 @@
+@startuml
+!include <C4/C4_Container>
+
+title C4 Container Diagram — Smart Home Ecosystem
+
+Person(user, "Пользователь", "Управляет домом, устройствами и сценариями автоматизации")
+Person(support, "Сотрудник поддержки", "Помогает пользователям с настройкой и проблемами")
+
+System_Ext(partnerDevices, "Партнёрские устройства", "Устройства сторонних производителей")
+System_Ext(notificationProvider, "Провайдер уведомлений", "Email, SMS, Push")
+System_Ext(videoDevices, "Камеры видеонаблюдения", "Камеры и видеопотоки")
+System_Ext(homeDevices, "Устройства умного дома", "Отопление, датчики, свет, ворота и другие устройства")
+
+System_Boundary(system, "Экосистема умного дома") {
+
+    Container(webApp, "Web/Mobile UI", "Web / Mobile", "Интерфейс пользователя для управления домом, устройствами и сценариями")
+    Container(apiGateway, "API Gateway / BFF", "Go / Node.js", "Единая точка входа для клиентских приложений")
+
+    Container(userService, "User Service", "Go", "Пользователи, роли, авторизация и права доступа")
+    Container(houseService, "House Service", "Go", "Дома, помещения, зоны и структура объектов пользователя")
+    Container(deviceService, "Device Management Service", "Go", "Регистрация, настройка и учёт устройств")
+    Container(commandService, "Device Command Service", "Go", "Приём, проверка и отправка команд устройствам")
+    Container(telemetryService, "Telemetry Service", "Go", "Получение, хранение и предоставление телеметрии")
+    Container(scenarioService, "Scenario Service", "Go", "Пользовательские сценарии автоматизации")
+    Container(partnerService, "Partner Integration Service", "Go", "Интеграции с партнёрскими устройствами и внешними протоколами")
+    Container(notificationService, "Notification Service", "Go", "Отправка уведомлений пользователям")
+    Container(videoService, "Video Service", "Go", "Работа с камерами, видеопотоками и архивом")
+    Container(catalogService, "Catalog Service", "Go", "Каталог модулей, комплектов и совместимых устройств")
+
+    ContainerQueue(messageBroker, "Message Broker", "Kafka", "Асинхронный обмен командами, событиями и телеметрией")
+
+    ContainerDb(userDb, "User DB", "PostgreSQL", "Пользователи, роли и права доступа")
+    ContainerDb(houseDb, "House DB", "PostgreSQL", "Дома, комнаты и зоны")
+    ContainerDb(deviceDb, "Device DB", "PostgreSQL", "Устройства, типы, модели, производители и capabilities")
+    ContainerDb(commandDb, "Command DB", "PostgreSQL", "История команд и статусы выполнения")
+    ContainerDb(telemetryDb, "Telemetry DB", "TimescaleDB / PostgreSQL", "Текущая и историческая телеметрия")
+    ContainerDb(scenarioDb, "Scenario DB", "PostgreSQL", "Сценарии, условия и действия")
+    ContainerDb(notificationDb, "Notification DB", "PostgreSQL", "История уведомлений и статусы отправки")
+    ContainerDb(catalogDb, "Catalog DB", "PostgreSQL", "Каталог модулей, комплектов и совместимости")
+    ContainerDb(videoStorage, "Video Storage", "S3", "Видеоархив, снимки и метаданные")
+}
+
+Rel(user, webApp, "Использует")
+Rel(support, webApp, "Использует для поддержки пользователей")
+
+Rel(webApp, apiGateway, "HTTPS / REST")
+
+Rel(apiGateway, userService, "REST")
+Rel(apiGateway, houseService, "REST")
+Rel(apiGateway, deviceService, "REST")
+Rel(apiGateway, commandService, "REST")
+Rel(apiGateway, telemetryService, "REST")
+Rel(apiGateway, scenarioService, "REST")
+Rel(apiGateway, notificationService, "REST")
+Rel(apiGateway, videoService, "REST")
+Rel(apiGateway, catalogService, "REST")
+
+Rel(userService, userDb, "Read / Write")
+Rel(houseService, houseDb, "Read / Write")
+Rel(deviceService, deviceDb, "Read / Write")
+Rel(commandService, commandDb, "Read / Write")
+Rel(telemetryService, telemetryDb, "Read / Write")
+Rel(scenarioService, scenarioDb, "Read / Write")
+Rel(notificationService, notificationDb, "Read / Write")
+Rel(catalogService, catalogDb, "Read / Write")
+Rel(videoService, videoStorage, "Read / Write")
+
+Rel(commandService, messageBroker, "Публикует команды устройствам")
+Rel(telemetryService, messageBroker, "Получает и публикует события телеметрии")
+Rel(scenarioService, messageBroker, "Слушает события и публикует команды")
+Rel(notificationService, messageBroker, "Слушает события для уведомлений")
+Rel(partnerService, messageBroker, "Обменивается событиями с системой")
+
+Rel(messageBroker, homeDevices, "Команды и телеметрия")
+Rel(partnerService, partnerDevices, "Интегрируется через адаптеры")
+Rel(notificationService, notificationProvider, "Отправляет уведомления")
+Rel(videoService, videoDevices, "Получает видеопотоки и снимки")
+
+@enduml

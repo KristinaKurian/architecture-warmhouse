@@ -1,0 +1,551 @@
+openapi: 3.1.1
+info:
+  title: Partner Integration Service API
+  version: 1.1.0
+  description: Управление партнёрами, протокольными адаптерами и внешними подключениями устройств.
+servers:
+- url: https://api.smart-home.example.com/integrations/v1
+  description: Доступ через API Gateway
+- url: http://integrations:8080/v1
+  description: Внутренний адрес сервиса
+security:
+- bearerAuth: []
+tags:
+- name: Partners
+- name: Adapters
+- name: Integrations
+paths:
+  /partners:
+    get:
+      tags:
+      - Partners
+      summary: Список партнёров
+      responses:
+        '200':
+          description: Партнёры
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Partner'
+    post:
+      tags:
+      - Partners
+      summary: Создать партнёра
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePartnerRequest'
+      responses:
+        '201':
+          description: Партнёр создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Partner'
+  /partners/{partnerId}/adapters:
+    parameters:
+    - name: partnerId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Adapters
+      summary: Список адаптеров партнёра
+      responses:
+        '200':
+          description: Адаптеры
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Adapter'
+    post:
+      tags:
+      - Adapters
+      summary: Создать адаптер
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdapterRequest'
+      responses:
+        '201':
+          description: Адаптер создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Adapter'
+  /integrations:
+    post:
+      tags:
+      - Integrations
+      summary: Создать интеграцию устройства
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateIntegrationRequest'
+      responses:
+        '201':
+          description: Интеграция создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceIntegration'
+    get:
+      tags:
+      - Integrations
+      summary: Получить интеграции устройств
+      parameters:
+      - name: deviceId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: adapterId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: connectionStatus
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Интеграции устройств
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeviceIntegration'
+  /integrations/{integrationId}:
+    parameters:
+    - name: integrationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Integrations
+      summary: Получить интеграцию
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceIntegration'
+    patch:
+      tags:
+      - Integrations
+      summary: Изменить интеграцию
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateIntegrationRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceIntegration'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Integrations
+      summary: Удалить интеграцию
+      responses:
+        '204':
+          description: Интеграция удалена
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /integrations/{integrationId}/sync:
+    parameters:
+    - name: integrationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      tags:
+      - Integrations
+      summary: Запустить синхронизацию
+      responses:
+        '202':
+          description: Синхронизация запущена
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /partners/{partnerId}:
+    parameters:
+    - name: partnerId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Partners
+      summary: Получить партнёра
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Partner'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Partners
+      summary: Изменить партнёра
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePartnerRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Partner'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Partners
+      summary: Удалить партнёра
+      responses:
+        '204':
+          description: Партнёр удалён
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /partners/{partnerId}/adapters/{adapterId}:
+    parameters:
+    - name: partnerId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: adapterId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Adapters
+      summary: Получить адаптер
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Adapter'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Adapters
+      summary: Изменить адаптер
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAdapterRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Adapter'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Adapters
+      summary: Удалить адаптер
+      responses:
+        '204':
+          description: Адаптер удалён
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Некорректные параметры запроса
+        details:
+          type: object
+          additionalProperties: true
+        traceId:
+          type: string
+          example: 01J0TRACEIDEXAMPLE
+    PageInfo:
+      type: object
+      required:
+      - limit
+      - offset
+      - total
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        offset:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+    Partner:
+      type: object
+      required:
+      - id
+      - name
+      - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - DISABLED
+          - TESTING
+    CreatePartnerRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+    Adapter:
+      type: object
+      required:
+      - id
+      - partnerId
+      - name
+      - protocol
+      - enabled
+      properties:
+        id:
+          type: string
+          format: uuid
+        partnerId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        protocol:
+          type: string
+          enum:
+          - MQTT
+          - HTTP
+          - COAP
+          - ZIGBEE
+          - ZWAVE
+          - VENDOR_API
+        configuration:
+          type: object
+          additionalProperties: true
+          writeOnly: true
+        enabled:
+          type: boolean
+    CreateAdapterRequest:
+      type: object
+      required:
+      - name
+      - protocol
+      - configuration
+      properties:
+        name:
+          type: string
+        protocol:
+          type: string
+        configuration:
+          type: object
+          additionalProperties: true
+        enabled:
+          type: boolean
+          default: true
+    DeviceIntegration:
+      type: object
+      required:
+      - id
+      - deviceId
+      - adapterId
+      - externalDeviceId
+      - connectionStatus
+      properties:
+        id:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        adapterId:
+          type: string
+          format: uuid
+        externalDeviceId:
+          type: string
+        connectionStatus:
+          type: string
+          enum:
+          - CONNECTED
+          - DISCONNECTED
+          - ERROR
+          - PENDING
+        lastSyncAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+    CreateIntegrationRequest:
+      type: object
+      required:
+      - deviceId
+      - adapterId
+      - externalDeviceId
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        adapterId:
+          type: string
+          format: uuid
+        externalDeviceId:
+          type: string
+        credentials:
+          type: object
+          additionalProperties: true
+          writeOnly: true
+    UpdatePartnerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - DISABLED
+          - TESTING
+    UpdateAdapterRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        configuration:
+          type: object
+          additionalProperties: true
+        enabled:
+          type: boolean
+    UpdateIntegrationRequest:
+      type: object
+      properties:
+        externalDeviceId:
+          type: string
+        credentials:
+          type: object
+          additionalProperties: true
+          writeOnly: true
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Требуется аутентификация
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Недостаточно прав
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Конфликт состояния ресурса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0

@@ -1,0 +1,454 @@
+openapi: 3.1.1
+info:
+  title: Scenario Service API
+  version: 1.1.0
+  description: Управление сценариями, обработка событий состояния, проверка условий, формирование действий и история запусков.
+servers:
+- url: https://api.smart-home.example.com/scenarios/v1
+  description: Доступ через API Gateway
+- url: http://scenarios:8080/v1
+  description: Внутренний адрес сервиса
+security:
+- bearerAuth: []
+tags:
+- name: Scenarios
+- name: Executions
+paths:
+  /scenarios:
+    get:
+      tags:
+      - Scenarios
+      summary: Список сценариев
+      parameters:
+      - name: houseId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Сценарии
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Scenario'
+    post:
+      tags:
+      - Scenarios
+      summary: Создать сценарий
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScenarioRequest'
+      responses:
+        '201':
+          description: Сценарий создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scenario'
+  /scenarios/{scenarioId}:
+    parameters:
+    - name: scenarioId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Scenarios
+      summary: Получить сценарий
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scenario'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags:
+      - Scenarios
+      summary: Полностью обновить сценарий
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScenarioRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scenario'
+    delete:
+      tags:
+      - Scenarios
+      summary: Удалить сценарий
+      responses:
+        '204':
+          description: Сценарий удалён
+    patch:
+      tags:
+      - Scenarios
+      summary: Частично изменить сценарий
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScenarioRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scenario'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /scenarios/{scenarioId}/enable:
+    parameters:
+    - name: scenarioId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      tags:
+      - Scenarios
+      summary: Включить сценарий
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scenario'
+  /scenarios/{scenarioId}/disable:
+    parameters:
+    - name: scenarioId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      tags:
+      - Scenarios
+      summary: Выключить сценарий
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scenario'
+  /scenarios/{scenarioId}/executions:
+    parameters:
+    - name: scenarioId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Executions
+      summary: История запусков сценария
+      responses:
+        '200':
+          description: Запуски
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScenarioExecution'
+  /scenarios/{scenarioId}/execute:
+    parameters:
+    - name: scenarioId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      tags:
+      - Executions
+      summary: Запустить сценарий вручную для проверки
+      responses:
+        '202':
+          description: Запуск принят
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScenarioExecution'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Некорректные параметры запроса
+        details:
+          type: object
+          additionalProperties: true
+        traceId:
+          type: string
+          example: 01J0TRACEIDEXAMPLE
+    PageInfo:
+      type: object
+      required:
+      - limit
+      - offset
+      - total
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        offset:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+    ScenarioCondition:
+      type: object
+      required:
+      - eventType
+      - operator
+      - orderNo
+      properties:
+        metricId:
+          oneOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+        eventType:
+          type: string
+          example: device.state.changed
+        operator:
+          type: string
+          enum:
+          - EQ
+          - NE
+          - GT
+          - GTE
+          - LT
+          - LTE
+          - IN
+        expectedValue:
+          description: Произвольное JSON-значение
+          oneOf:
+          - type: string
+          - type: number
+          - type: integer
+          - type: boolean
+          - type: object
+            additionalProperties: true
+          - type: array
+            items: {}
+          - type: 'null'
+        orderNo:
+          type: integer
+          minimum: 1
+    ScenarioAction:
+      type: object
+      required:
+      - deviceId
+      - commandType
+      - parameters
+      - orderNo
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        commandType:
+          type: string
+          example: heating.set
+        parameters:
+          type: object
+          additionalProperties: true
+        orderNo:
+          type: integer
+          minimum: 1
+    Scenario:
+      type: object
+      required:
+      - id
+      - houseId
+      - name
+      - enabled
+      - conditions
+      - actions
+      - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        houseId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        enabled:
+          type: boolean
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScenarioCondition'
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScenarioAction'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+    CreateScenarioRequest:
+      type: object
+      required:
+      - houseId
+      - name
+      - conditions
+      - actions
+      properties:
+        houseId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        enabled:
+          type: boolean
+          default: true
+        conditions:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ScenarioCondition'
+        actions:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/ScenarioAction'
+    ScenarioExecution:
+      type: object
+      required:
+      - id
+      - scenarioId
+      - status
+      - triggeredAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        scenarioId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - RUNNING
+          - COMPLETED
+          - FAILED
+          - SKIPPED
+        triggerEventId:
+          oneOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+        triggeredAt:
+          type: string
+          format: date-time
+        finishedAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        errorMessage:
+          type:
+          - string
+          - 'null'
+        triggerPayload:
+          type: object
+          additionalProperties: true
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Требуется аутентификация
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Недостаточно прав
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Конфликт состояния ресурса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0

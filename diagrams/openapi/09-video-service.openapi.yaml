@@ -1,0 +1,508 @@
+openapi: 3.1.1
+info:
+  title: Video Service API
+  version: 1.1.0
+  description: Подключение камер, выдача доступа к потокам, создание снимков и чтение метаданных видеоархива.
+servers:
+- url: https://api.smart-home.example.com/video/v1
+  description: Доступ через API Gateway
+- url: http://video:8080/v1
+  description: Внутренний адрес сервиса
+security:
+- bearerAuth: []
+tags:
+- name: Cameras
+- name: Streams
+- name: Snapshots
+- name: Recordings
+paths:
+  /cameras:
+    get:
+      tags:
+      - Cameras
+      summary: Список камер
+      parameters:
+      - name: houseId
+        in: query
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Камеры
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Camera'
+    post:
+      tags:
+      - Cameras
+      summary: Подключить камеру
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCameraRequest'
+      responses:
+        '201':
+          description: Камера подключена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Camera'
+  /cameras/{cameraId}:
+    parameters:
+    - name: cameraId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Cameras
+      summary: Получить камеру
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Camera'
+    patch:
+      tags:
+      - Cameras
+      summary: Изменить настройки камеры
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCameraRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Camera'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Cameras
+      summary: Отключить камеру
+      responses:
+        '204':
+          description: Камера отключена
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /cameras/{cameraId}/stream:
+    parameters:
+    - name: cameraId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Streams
+      summary: Получить временную ссылку на видеопоток
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreamAccess'
+      description: Возвращает временную ссылку доступа к активному потоку.
+  /cameras/{cameraId}/snapshots:
+    parameters:
+    - name: cameraId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      tags:
+      - Snapshots
+      summary: Создать снимок
+      responses:
+        '201':
+          description: Снимок создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Snapshot'
+    get:
+      tags:
+      - Snapshots
+      summary: Получить снимки камеры
+      parameters:
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        '200':
+          description: Снимки камеры
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Snapshot'
+  /cameras/{cameraId}/recordings:
+    parameters:
+    - name: cameraId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Recordings
+      summary: Получить архив записей
+      parameters:
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date-time
+      responses:
+        '200':
+          description: Записи
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Recording'
+  /cameras/{cameraId}/streams:
+    parameters:
+    - name: cameraId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Streams
+      summary: Получить метаданные потоков камеры
+      responses:
+        '200':
+          description: Потоки камеры
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VideoStream'
+  /recordings/{recordingId}:
+    parameters:
+    - name: recordingId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Recordings
+      summary: Получить метаданные видеозаписи
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recording'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Некорректные параметры запроса
+        details:
+          type: object
+          additionalProperties: true
+        traceId:
+          type: string
+          example: 01J0TRACEIDEXAMPLE
+    PageInfo:
+      type: object
+      required:
+      - limit
+      - offset
+      - total
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        offset:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+    Camera:
+      type: object
+      required:
+      - id
+      - deviceId
+      - houseId
+      - name
+      - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        houseId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          type: string
+          enum:
+          - ONLINE
+          - OFFLINE
+          - UNAVAILABLE
+        roomId:
+          oneOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+        createdAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        updatedAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+    CreateCameraRequest:
+      type: object
+      required:
+      - deviceId
+      - houseId
+      - name
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        houseId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        roomId:
+          oneOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+    StreamAccess:
+      type: object
+      required:
+      - url
+      - expiresAt
+      properties:
+        url:
+          type: string
+          format: uri
+        protocol:
+          type: string
+          enum:
+          - HLS
+          - WEBRTC
+        expiresAt:
+          type: string
+          format: date-time
+    Snapshot:
+      type: object
+      required:
+      - id
+      - cameraId
+      - url
+      - capturedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        cameraId:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+        capturedAt:
+          type: string
+          format: date-time
+    Recording:
+      type: object
+      required:
+      - id
+      - cameraId
+      - startedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        cameraId:
+          type: string
+          format: uuid
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        sizeBytes:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        downloadUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+    UpdateCameraRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        houseId:
+          type: string
+          format: uuid
+        roomId:
+          oneOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+    VideoStream:
+      type: object
+      required:
+      - id
+      - cameraId
+      - protocol
+      - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        cameraId:
+          type: string
+          format: uuid
+        protocol:
+          type: string
+          enum:
+          - HLS
+          - WEBRTC
+          - RTSP
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - INACTIVE
+          - ERROR
+        accessUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+        expiresAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Требуется аутентификация
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Недостаточно прав
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Конфликт состояния ресурса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0

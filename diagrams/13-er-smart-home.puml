@@ -1,0 +1,500 @@
+@startuml
+
+title ER Diagram - Smart Home Ecosystem
+
+hide methods
+left to right direction
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+' Сплошные связи — внутри одной базы данных/контекста.
+' Пунктирные связи — логические ссылки между микросервисами.
+' Физические межбазовые FOREIGN KEY для пунктирных связей не создаются.
+
+package "User Service / User DB" {
+    entity "USER" as usr {
+        * id : UUID <<PK>>
+        --
+        * email : varchar(255) <<UQ>>
+        * password_hash : varchar(255)
+        full_name : varchar(255)
+        phone : varchar(32)
+        locale : varchar(16)
+        settings : jsonb
+        * status : varchar(32)
+        * created_at : timestamptz
+        updated_at : timestamptz
+    }
+
+    entity "ROLE" as role {
+        * id : UUID <<PK>>
+        --
+        * code : varchar(64) <<UQ>>
+        * name : varchar(128)
+        description : text
+    }
+
+    entity "USER_ROLE" as user_role {
+        * user_id : UUID <<PK, FK>>
+        * role_id : UUID <<PK, FK>>
+        --
+        * assigned_at : timestamptz
+    }
+
+    entity "SESSION" as session {
+        * id : UUID <<PK>>
+        --
+        * user_id : UUID <<FK>>
+        * refresh_token_hash : varchar(255) <<UQ>>
+        user_agent : varchar(500)
+        ip_address : inet
+        * expires_at : timestamptz
+        revoked_at : timestamptz
+        * created_at : timestamptz
+    }
+}
+
+package "House Service / House DB" {
+    entity "HOUSE" as house {
+        * id : UUID <<PK>>
+        --
+        * name : varchar(255)
+        address : text
+        * timezone : varchar(64)
+        * created_at : timestamptz
+        updated_at : timestamptz
+    }
+
+    entity "HOUSE_MEMBER" as house_member {
+        * house_id : UUID <<PK, FK>>
+        * user_id : UUID <<PK, external>>
+        --
+        * membership_role : varchar(32)
+        * joined_at : timestamptz
+    }
+
+    entity "ROOM" as room {
+        * id : UUID <<PK>>
+        --
+        * house_id : UUID <<FK>>
+        * name : varchar(128)
+        floor : integer
+        * created_at : timestamptz
+        updated_at : timestamptz
+    }
+
+    entity "ZONE" as zone {
+        * id : UUID <<PK>>
+        --
+        * room_id : UUID <<FK>>
+        * name : varchar(128)
+        description : text
+        * created_at : timestamptz
+        updated_at : timestamptz
+    }
+}
+
+package "Device Management Service / Device DB" {
+    entity "MANUFACTURER" as manufacturer {
+        * id : UUID <<PK>>
+        --
+        * name : varchar(255) <<UQ>>
+        website : varchar(500)
+    }
+
+    entity "DEVICE_MODEL" as device_model {
+        * id : UUID <<PK>>
+        --
+        * manufacturer_id : UUID <<FK>>
+        * name : varchar(255)
+        * device_type : varchar(64)
+        * protocol : varchar(64)
+        firmware_version : varchar(64)
+    }
+
+    entity "CAPABILITY" as capability {
+        * id : UUID <<PK>>
+        --
+        * code : varchar(64) <<UQ>>
+        * name : varchar(128)
+        * value_type : varchar(32)
+        unit : varchar(32)
+    }
+
+    entity "MODEL_CAPABILITY" as model_capability {
+        * device_model_id : UUID <<PK, FK>>
+        * capability_id : UUID <<PK, FK>>
+        --
+        configuration : jsonb
+    }
+
+    entity "DEVICE" as device {
+        * id : UUID <<PK>>
+        --
+        * device_model_id : UUID <<FK>>
+        * serial_number : varchar(255) <<UQ>>
+        display_name : varchar(255)
+        * status : varchar(32)
+        registered_by_user_id : UUID <<external>>
+        * registered_at : timestamptz
+        last_seen_at : timestamptz
+        updated_at : timestamptz
+    }
+
+    entity "DEVICE_BINDING" as device_binding {
+        * id : UUID <<PK>>
+        --
+        * device_id : UUID <<FK>>
+        * house_id : UUID <<external>>
+        room_id : UUID <<external>>
+        zone_id : UUID <<external>>
+        * bound_at : timestamptz
+        unbound_at : timestamptz
+    }
+}
+
+package "Device Command Service / Command DB" {
+    entity "DEVICE_COMMAND" as device_command {
+        * id : UUID <<PK>>
+        --
+        * device_id : UUID <<external>>
+        requested_by_user_id : UUID <<external>>
+        scenario_id : UUID <<external>>
+        idempotency_key : varchar(128) <<UQ>>
+        * command_type : varchar(64)
+        * parameters : jsonb
+        * status : varchar(32)
+        * created_at : timestamptz
+        completed_at : timestamptz
+    }
+
+    entity "COMMAND_STATUS_HISTORY" as command_status_history {
+        * id : UUID <<PK>>
+        --
+        * command_id : UUID <<FK>>
+        * status : varchar(32)
+        details : jsonb
+        * occurred_at : timestamptz
+    }
+}
+
+package "Telemetry Service / Telemetry DB" {
+    entity "DEVICE_METRIC" as device_metric {
+        * id : UUID <<PK>>
+        --
+        * device_id : UUID <<external>>
+        * code : varchar(64)
+        * value_type : varchar(32)
+        unit : varchar(32)
+        configuration : jsonb
+    }
+
+    entity "TELEMETRY_READING" as telemetry_reading {
+        * id : UUID <<PK>>
+        --
+        * metric_id : UUID <<FK>>
+        * value : jsonb
+        * measured_at : timestamptz
+        * received_at : timestamptz
+    }
+
+    entity "CURRENT_DEVICE_STATE" as current_device_state {
+        * metric_id : UUID <<PK, FK>>
+        --
+        * value : jsonb
+        * measured_at : timestamptz
+        * updated_at : timestamptz
+    }
+}
+
+package "Scenario Service / Scenario DB" {
+    entity "SCENARIO" as scenario {
+        * id : UUID <<PK>>
+        --
+        * house_id : UUID <<external>>
+        * created_by_user_id : UUID <<external>>
+        * name : varchar(255)
+        * enabled : boolean
+        * created_at : timestamptz
+        updated_at : timestamptz
+    }
+
+    entity "SCENARIO_CONDITION" as scenario_condition {
+        * id : UUID <<PK>>
+        --
+        * scenario_id : UUID <<FK>>
+        metric_id : UUID <<external>>
+        * event_type : varchar(64)
+        * operator : varchar(16)
+        expected_value : jsonb
+        * order_no : integer
+    }
+
+    entity "SCENARIO_ACTION" as scenario_action {
+        * id : UUID <<PK>>
+        --
+        * scenario_id : UUID <<FK>>
+        * device_id : UUID <<external>>
+        * command_type : varchar(64)
+        * parameters : jsonb
+        * order_no : integer
+    }
+
+    entity "SCENARIO_EXECUTION" as scenario_execution {
+        * id : UUID <<PK>>
+        --
+        * scenario_id : UUID <<FK>>
+        * status : varchar(32)
+        trigger_event_id : UUID
+        trigger_payload : jsonb
+        * triggered_at : timestamptz
+        finished_at : timestamptz
+        error_message : text
+    }
+}
+
+package "Partner Integration Service / Partner Config DB" {
+    entity "PARTNER" as partner {
+        * id : UUID <<PK>>
+        --
+        * name : varchar(255) <<UQ>>
+        * status : varchar(32)
+        * created_at : timestamptz
+        updated_at : timestamptz
+    }
+
+    entity "PARTNER_ADAPTER" as partner_adapter {
+        * id : UUID <<PK>>
+        --
+        * partner_id : UUID <<FK>>
+        * name : varchar(128)
+        * protocol : varchar(64)
+        configuration : jsonb
+        * enabled : boolean
+    }
+
+    entity "DEVICE_INTEGRATION" as device_integration {
+        * id : UUID <<PK>>
+        --
+        * device_id : UUID <<external, UQ>>
+        * adapter_id : UUID <<FK>>
+        * external_device_id : varchar(255)
+        * connection_status : varchar(32)
+        last_sync_at : timestamptz
+    }
+}
+
+package "Notification Service / Notification DB" {
+    entity "NOTIFICATION_PREFERENCE" as notification_preference {
+        * id : UUID <<PK>>
+        --
+        * user_id : UUID <<external>>
+        * event_type : varchar(64)
+        * channel : varchar(32)
+        * enabled : boolean
+    }
+
+    entity "NOTIFICATION_TEMPLATE" as notification_template {
+        * id : UUID <<PK>>
+        --
+        * code : varchar(64)
+        * channel : varchar(32)
+        locale : varchar(16)
+        subject_template : text
+        * body_template : text
+        * active : boolean
+    }
+
+    entity "NOTIFICATION" as notification {
+        * id : UUID <<PK>>
+        --
+        * user_id : UUID <<external>>
+        template_id : UUID <<FK>>
+        source_event_id : UUID
+        * event_type : varchar(64)
+        payload : jsonb
+        * status : varchar(32)
+        * created_at : timestamptz
+    }
+
+    entity "NOTIFICATION_DELIVERY" as notification_delivery {
+        * id : UUID <<PK>>
+        --
+        * notification_id : UUID <<FK>>
+        * channel : varchar(32)
+        recipient : varchar(500)
+        provider_message_id : varchar(255)
+        * status : varchar(32)
+        * attempted_at : timestamptz
+        sent_at : timestamptz
+        error_message : text
+    }
+}
+
+package "Video Service / Video Metadata DB" {
+    entity "CAMERA" as camera {
+        * id : UUID <<PK>>
+        --
+        * device_id : UUID <<external, UQ>>
+        * house_id : UUID <<external>>
+        room_id : UUID <<external>>
+        * name : varchar(255)
+        * status : varchar(32)
+        * created_at : timestamptz
+        updated_at : timestamptz
+    }
+
+    entity "VIDEO_STREAM" as video_stream {
+        * id : UUID <<PK>>
+        --
+        * camera_id : UUID <<FK>>
+        * protocol : varchar(32)
+        * stream_endpoint : varchar(500)
+        * status : varchar(32)
+        started_at : timestamptz
+        ended_at : timestamptz
+    }
+
+    entity "VIDEO_RECORDING" as video_recording {
+        * id : UUID <<PK>>
+        --
+        * camera_id : UUID <<FK>>
+        stream_id : UUID <<FK>>
+        * object_key : varchar(1024)
+        * started_at : timestamptz
+        ended_at : timestamptz
+        size_bytes : bigint
+    }
+
+    entity "SNAPSHOT" as snapshot {
+        * id : UUID <<PK>>
+        --
+        * camera_id : UUID <<FK>>
+        * object_key : varchar(1024)
+        * captured_at : timestamptz
+    }
+}
+
+package "Catalog Service / Catalog DB" {
+    entity "CATALOG_ITEM" as catalog_item {
+        * id : UUID <<PK>>
+        --
+        device_model_id : UUID <<external>>
+        * sku : varchar(64) <<UQ>>
+        * name : varchar(255)
+        * item_type : varchar(32)
+        description : text
+        connection_parameters : jsonb
+        * publication_status : varchar(32)
+        * created_at : timestamptz
+        updated_at : timestamptz
+    }
+
+    entity "BUNDLE" as bundle {
+        * id : UUID <<PK>>
+        --
+        * name : varchar(255)
+        description : text
+        * publication_status : varchar(32)
+        * created_at : timestamptz
+        updated_at : timestamptz
+    }
+
+    entity "BUNDLE_ITEM" as bundle_item {
+        * bundle_id : UUID <<PK, FK>>
+        * catalog_item_id : UUID <<PK, FK>>
+        --
+        * quantity : integer
+    }
+
+    entity "COMPATIBILITY" as compatibility {
+        * id : UUID <<PK>>
+        --
+        * source_item_id : UUID <<FK>>
+        * target_item_id : UUID <<FK>>
+        * relation_type : varchar(32)
+        notes : text
+    }
+}
+
+' User Service
+usr ||--o{ user_role : "имеет роли"
+role ||--o{ user_role : "назначается пользователям"
+usr ||--o{ session : "открывает сессии"
+
+' House Service
+house ||--o{ house_member : "имеет участников"
+usr ||..o{ house_member : "состоит в доме"
+house ||--o{ room : "содержит"
+room ||--o{ zone : "содержит"
+
+' Device Management Service
+manufacturer ||--o{ device_model : "выпускает"
+device_model ||--o{ device : "имеет экземпляры"
+device_model ||--o{ model_capability : "поддерживает"
+capability ||--o{ model_capability : "назначается моделям"
+device ||--o{ device_binding : "имеет историю привязок"
+usr |o..o{ device : "регистрирует"
+house ||..o{ device_binding : "размещает устройства"
+room |o..o{ device_binding : "может размещать"
+zone |o..o{ device_binding : "может размещать"
+
+' Device Command Service
+device ||..o{ device_command : "получает команды"
+usr |o..o{ device_command : "может инициировать"
+scenario |o..o{ device_command : "может инициировать"
+device_command ||--o{ command_status_history : "имеет историю статусов"
+
+' Telemetry Service
+device ||..o{ device_metric : "имеет метрики"
+device_metric ||--o{ telemetry_reading : "имеет показания"
+device_metric ||--o| current_device_state : "имеет текущее состояние"
+
+' Scenario Service
+house ||..o{ scenario : "имеет сценарии"
+usr ||..o{ scenario : "создаёт"
+scenario ||--o{ scenario_condition : "содержит условия"
+scenario ||--o{ scenario_action : "содержит действия"
+scenario ||--o{ scenario_execution : "имеет историю запусков"
+device_metric |o..o{ scenario_condition : "используется в условии"
+device ||..o{ scenario_action : "является целью"
+
+' Partner Integration Service
+partner ||--o{ partner_adapter : "предоставляет адаптеры"
+partner_adapter ||--o{ device_integration : "обслуживает интеграции"
+device ||..o| device_integration : "имеет внешнее подключение"
+
+' Notification Service
+usr ||..o{ notification_preference : "настраивает"
+usr ||..o{ notification : "получает"
+notification_template |o--o{ notification : "используется для"
+notification ||--o{ notification_delivery : "имеет попытки доставки"
+
+' Video Service
+device ||..o| camera : "может быть камерой"
+house ||..o{ camera : "содержит камеры"
+room |o..o{ camera : "может содержать камеры"
+camera ||--o{ video_stream : "предоставляет потоки"
+camera ||--o{ video_recording : "создаёт записи"
+video_stream |o--o{ video_recording : "может быть источником"
+camera ||--o{ snapshot : "создаёт снимки"
+
+' Catalog Service
+device_model |o..o{ catalog_item : "может быть представлен"
+bundle ||--o{ bundle_item : "содержит"
+catalog_item ||--o{ bundle_item : "входит в комплекты"
+catalog_item ||--o{ compatibility : "исходный элемент"
+catalog_item ||--o{ compatibility : "целевой элемент"
+
+legend left
+  |= Обозначение |= Значение |
+  | <<PK>> | Первичный ключ |
+  | <<FK>> | Внешний ключ внутри базы сервиса |
+  | <<UQ>> | Уникальное значение |
+  | <<external>> | Идентификатор сущности другого сервиса |
+  | Сплошная линия | Связь внутри одного контекста/БД |
+  | Пунктирная линия | Логическая межсервисная связь без межбазового FK |
+endlegend
+
+@enduml

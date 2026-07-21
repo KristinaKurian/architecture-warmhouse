@@ -1,0 +1,36 @@
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — House Service
+
+Container_Boundary(houseService, "House Service") {
+    Component(houseApi, "House API", "REST Controller", "Принимает запросы на создание и изменение домов, помещений, зон и управление доступом к дому")
+
+    Component(homeStructureComponent, "Home Structure Component", "Application Service", "Управляет структурой дома: домами, комнатами и зонами, а также проверяет связи между ними")
+
+    Component(houseAccessComponent, "House Access Component", "Application Service", "Управляет участниками дома и проверяет права пользователей на просмотр и изменение объектов дома")
+
+    Component(houseRepository, "House Repository", "Repository", "Читает и сохраняет дома, комнаты, зоны и участников дома")
+}
+
+Container(apiGateway, "API Gateway / BFF", "Go", "Единая точка входа для клиентских приложений")
+
+ContainerDb(houseDb, "House DB", "PostgreSQL", "Хранит дома, комнаты, зоны, владельцев и участников дома")
+
+Container(userService, "User Service", "Go", "Предоставляет информацию о пользователях и их учётных записях")
+
+Rel(apiGateway, houseApi, "Передаёт запросы управления домом", "REST / HTTPS")
+
+Rel(houseApi, homeStructureComponent, "Передаёт запросы управления домами, комнатами и зонами")
+
+Rel(houseApi, houseAccessComponent, "Передаёт запросы управления участниками и проверки доступа")
+
+Rel(homeStructureComponent, houseRepository, "Читает и изменяет структуру дома")
+
+Rel(houseAccessComponent, houseRepository, "Читает и изменяет участников и права доступа")
+
+Rel(houseAccessComponent, userService, "Проверяет существование пользователя", "REST")
+
+Rel(houseRepository, houseDb, "Читает и сохраняет данные", "SQL")
+
+@enduml

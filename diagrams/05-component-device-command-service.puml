@@ -1,0 +1,44 @@
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — Device Command Service
+
+Container_Boundary(commandService, "Device Command Service") {
+    Component(commandApi, "Command API", "REST Controller", "Принимает команды от пользовательского интерфейса и других сервисов, а также предоставляет текущий статус и историю команд")
+
+    Component(commandApplication, "Command Application Component", "Application Service", "Проверяет устройство и параметры команды, создаёт команду, сохраняет её и инициирует асинхронную отправку")
+
+    Component(commandPublisher, "Command Publisher", "Messaging Adapter", "Преобразует команду во внутреннее сообщение и публикует её в брокер сообщений")
+
+    Component(commandStatusConsumer, "Command Status Consumer", "Messaging Consumer", "Получает события о доставке и выполнении команды и обновляет её текущий статус")
+
+    Component(commandRepository, "Command Repository", "Repository", "Читает и сохраняет команды, их параметры, текущие статусы и историю изменения статусов")
+}
+
+Container(apiGateway, "API Gateway / BFF", "Go", "Единая точка входа для клиентских приложений")
+
+Container(deviceService, "Device Management Service", "Go", "Предоставляет информацию об устройствах и поддерживаемых capabilities")
+
+ContainerQueue(messageBroker, "Message Broker", "Kafka", "Передаёт команды устройствам и события изменения статуса команд")
+
+ContainerDb(commandDb, "Command DB", "PostgreSQL", "Хранит команды, параметры, текущие статусы и историю изменения статусов")
+
+Rel(apiGateway, commandApi, "Передаёт команды и запросы истории", "REST / HTTPS")
+
+Rel(commandApi, commandApplication, "Передаёт команды и запросы получения статуса")
+
+Rel(commandApplication, deviceService, "Проверяет существование устройства и поддержку команды", "REST")
+
+Rel(commandApplication, commandRepository, "Создаёт команду и читает её состояние")
+
+Rel(commandApplication, commandPublisher, "Передаёт сохранённую команду для публикации")
+
+Rel(commandPublisher, messageBroker, "Публикует команду", "Kafka")
+
+Rel(messageBroker, commandStatusConsumer, "Передаёт события изменения статуса", "Kafka")
+
+Rel(commandStatusConsumer, commandRepository, "Обновляет статус и сохраняет историю")
+
+Rel(commandRepository, commandDb, "Читает и сохраняет данные", "SQL")
+
+@enduml

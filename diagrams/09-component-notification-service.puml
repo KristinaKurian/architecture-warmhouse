@@ -1,0 +1,44 @@
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram - Notification Service
+
+Container_Boundary(notificationService, "Notification Service") {
+    Component(notificationApi, "Notification API", "REST Controller", "Принимает запросы на управление настройками уведомлений и просмотр истории доставки")
+
+    Component(eventConsumer, "Notification Event Consumer", "Kafka Consumer", "Получает события устройств, телеметрии, команд и сценариев из брокера сообщений")
+
+    Component(notificationApplication, "Notification Application Component", "Application Service", "Проверяет пользовательские настройки, выбирает канал и шаблон, формирует уведомление и сохраняет его состояние")
+
+    Component(deliveryAdapter, "Notification Delivery Adapter", "Integration Adapter", "Отправляет подготовленные уведомления через email, SMS или push-провайдера")
+
+    Component(notificationRepository, "Notification Repository", "Repository", "Читает и сохраняет настройки пользователей, уведомления, попытки доставки и статусы отправки")
+}
+
+Container(apiGateway, "API Gateway / BFF", "Go", "Единая точка входа для клиентских приложений")
+
+ContainerQueue(messageBroker, "Message Broker", "Kafka", "Передаёт события устройств, команд, телеметрии и сценариев")
+
+System_Ext(notificationProvider, "Notification Provider", "Email, SMS, Push", "Внешний провайдер доставки уведомлений")
+
+ContainerDb(notificationDb, "Notification DB", "PostgreSQL", "Хранит пользовательские настройки, уведомления, попытки доставки и статусы отправки")
+
+Rel(apiGateway, notificationApi, "Передаёт запросы управления уведомлениями", "REST / HTTPS")
+
+Rel(notificationApi, notificationApplication, "Передаёт запросы настроек и просмотра истории")
+
+Rel(messageBroker, eventConsumer, "Передаёт события системы", "Kafka")
+
+Rel(eventConsumer, notificationApplication, "Передаёт событие для формирования уведомления")
+
+Rel(notificationApplication, notificationRepository, "Читает настройки и сохраняет уведомления")
+
+Rel(notificationApplication, deliveryAdapter, "Передаёт подготовленное сообщение")
+
+Rel(deliveryAdapter, notificationProvider, "Отправляет email, SMS или push", "HTTPS / Provider API")
+
+Rel(deliveryAdapter, notificationRepository, "Сохраняет результат попытки доставки")
+
+Rel(notificationRepository, notificationDb, "Читает и сохраняет данные", "SQL")
+
+@enduml

@@ -1,0 +1,35 @@
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — Video Service
+
+Container_Boundary(videoService, "Video Service") {
+    Component(videoApi, "Video API", "REST Controller", "Доступ к камерам, снимкам и архиву")
+    Component(cameraManagement, "Camera Management Component", "Application Service", "Подключение и настройка камер")
+    Component(streamAccess, "Stream Access Component", "Application Service", "Предоставление видеопотока")
+    Component(snapshotComponent, "Snapshot Component", "Application Service", "Получение снимков с камеры")
+    Component(archiveComponent, "Archive Component", "Application Service", "Работа с видеоархивом")
+    Component(videoRepository, "Video Metadata Repository", "Repository", "Метаданные камер и записей")
+}
+
+Container(apiGateway, "API Gateway / BFF", "Go", "Единая точка входа")
+System_Ext(videoDevices, "Камеры видеонаблюдения", "Камеры и видеопотоки")
+ContainerDb(videoStorage, "Video Storage", "S3 / Object Storage", "Видеоархив, снимки и метаданные")
+ContainerDb(videoMetaDb, "Video Metadata DB", "PostgreSQL", "Метаданные камер, потоков и записей")
+
+Rel(apiGateway, videoApi, "REST")
+Rel(videoApi, cameraManagement, "")
+Rel(videoApi, streamAccess, "")
+Rel(videoApi, snapshotComponent, "")
+Rel(videoApi, archiveComponent, "")
+
+Rel(cameraManagement, videoRepository, "")
+Rel(streamAccess, videoDevices, "Получает видеопоток")
+Rel(snapshotComponent, videoDevices, "Получает снимок")
+Rel(snapshotComponent, videoStorage, "Сохраняет снимки")
+Rel(archiveComponent, videoStorage, "Читает / пишет архив")
+Rel(archiveComponent, videoRepository, "Читает / пишет метаданные")
+
+Rel(videoRepository, videoMetaDb, "Read / Write")
+
+@enduml

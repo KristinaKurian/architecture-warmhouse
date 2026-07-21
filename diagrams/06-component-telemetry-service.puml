@@ -1,0 +1,41 @@
+@startuml
+
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title C4 Component Diagram - Telemetry Service
+
+Container_Boundary(telemetryService, "Telemetry Service") {
+    Component(telemetryApi, "Telemetry API", "REST Controller", "Предоставляет текущее состояние устройств и исторические телеметрические показания")
+
+    Component(telemetryConsumer, "Telemetry Ingestion Consumer", "Kafka Consumer", "Получает телеметрические показания устройств из брокера сообщений")
+
+    Component(telemetryApplication, "Telemetry Application Component", "Application Service", "Проверяет и обрабатывает телеметрию, сохраняет историю, обновляет текущее состояние и определяет изменения значений")
+
+    Component(telemetryEventPublisher, "Telemetry Event Publisher", "Kafka Producer", "Публикует события изменения состояния и показаний устройств")
+
+    Component(telemetryRepository, "Telemetry Repository", "Repository", "Читает и сохраняет текущие состояния, метрики и исторические показания")
+}
+
+Container(apiGateway, "API Gateway / BFF", "Go", "Единая точка входа для клиентских приложений")
+
+ContainerQueue(messageBroker, "Message Broker", "Kafka", "Передаёт телеметрию и события изменения состояния устройств")
+
+ContainerDb(telemetryDb, "Telemetry DB", "TimescaleDB / PostgreSQL", "Хранит метрики, текущие состояния и историю телеметрических показаний")
+
+Rel(apiGateway, telemetryApi, "Запрашивает текущую и историческую телеметрию", "REST / HTTPS")
+
+Rel(telemetryApi, telemetryApplication, "Передаёт запросы на получение телеметрии")
+
+Rel(messageBroker, telemetryConsumer, "Передаёт телеметрические показания", "Kafka")
+
+Rel(telemetryConsumer, telemetryApplication, "Передаёт полученные показания для обработки")
+
+Rel(telemetryApplication, telemetryRepository, "Читает и сохраняет телеметрию")
+
+Rel(telemetryApplication, telemetryEventPublisher, "Передаёт события изменения состояния")
+
+Rel(telemetryEventPublisher, messageBroker, "Публикует события изменения состояния", "Kafka")
+
+Rel(telemetryRepository, telemetryDb, "Читает и сохраняет данные", "SQL")
+
+@enduml

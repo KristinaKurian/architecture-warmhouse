@@ -1,0 +1,191 @@
+@startuml
+title Code Diagram - Device Command Service
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "API" {
+    class CommandController {
+        +CreateCommand(request: CreateCommandRequest): CommandResponse
+        +GetCommand(commandId: UUID): CommandResponse
+        +GetDeviceHistory(deviceId: UUID): List<CommandResponse>
+    }
+
+    class CreateCommandRequest {
+        +deviceId: UUID
+        +commandType: String
+        +parameters: JSON
+        +scenarioId: UUID?
+        +idempotencyKey: String?
+    }
+
+    class CommandResponse {
+        +id: UUID
+        +deviceId: UUID
+        +commandType: String
+        +parameters: JSON
+        +status: CommandStatus
+        +createdAt: DateTime
+        +completedAt: DateTime?
+    }
+}
+
+package "Application" {
+    class CommandApplicationService {
+        +CreateCommand(request: CreateCommandRequest, userId: UUID?): DeviceCommand
+        +GetCommand(commandId: UUID): DeviceCommand
+        +GetDeviceHistory(deviceId: UUID): List<DeviceCommand>
+    }
+
+    interface DeviceManagementClient {
+        +GetDevice(deviceId: UUID): DeviceInfo
+    }
+
+    class DeviceInfo {
+        +id: UUID
+        +status: String
+        +capabilities: List<String>
+        +Supports(commandType: String): Boolean
+    }
+}
+
+package "Domain" {
+    class DeviceCommand {
+        +id: UUID
+        +deviceId: UUID
+        +requestedByUserId: UUID?
+        +scenarioId: UUID?
+        +idempotencyKey: String?
+        +commandType: String
+        +parameters: JSON
+        +status: CommandStatus
+        +createdAt: DateTime
+        +completedAt: DateTime?
+        +MarkSent()
+        +MarkCompleted()
+        +MarkFailed(reason: String)
+    }
+
+    enum CommandStatus {
+        PENDING
+        SENT
+        COMPLETED
+        FAILED
+    }
+
+    class CommandStatusHistory {
+        +id: UUID
+        +commandId: UUID
+        +status: CommandStatus
+        +details: JSON?
+        +occurredAt: DateTime
+    }
+}
+
+package "Ports" {
+    interface CommandRepository {
+        +Save(command: DeviceCommand)
+        +FindById(commandId: UUID): DeviceCommand
+        +FindByDeviceId(deviceId: UUID): List<DeviceCommand>
+        +UpdateStatus(commandId: UUID, status: CommandStatus, details: JSON?, occurredAt: DateTime)
+    }
+
+    interface CommandEventPublisher {
+        +Publish(message: DeviceCommandMessage)
+    }
+}
+
+package "Adapters" {
+    class HttpDeviceManagementClient {
+        +GetDevice(deviceId: UUID): DeviceInfo
+    }
+
+    class PostgreSQLCommandRepository {
+        +Save(command: DeviceCommand)
+        +FindById(commandId: UUID): DeviceCommand
+        +FindByDeviceId(deviceId: UUID): List<DeviceCommand>
+        +UpdateStatus(commandId: UUID, status: CommandStatus, details: JSON?, occurredAt: DateTime)
+    }
+
+    class KafkaCommandPublisher {
+        +Publish(message: DeviceCommandMessage)
+    }
+
+    class KafkaCommandStatusConsumer {
+        +Handle(event: CommandStatusChangedEvent)
+    }
+
+    class DeviceCommandMessage {
+        +eventId: UUID
+        +eventVersion: Integer
+        +commandId: UUID
+        +deviceId: UUID
+        +commandType: String
+        +parameters: JSON
+        +requestedByUserId: UUID?
+        +scenarioId: UUID?
+        +occurredAt: DateTime
+        +traceId: String?
+    }
+
+    class CommandStatusChangedEvent {
+        +eventId: UUID
+        +eventVersion: Integer
+        +commandId: UUID
+        +deviceId: UUID
+        +status: CommandStatus
+        +details: JSON?
+        +occurredAt: DateTime
+        +traceId: String?
+    }
+}
+
+CommandController --> CommandApplicationService : вызывает
+CommandController --> CreateCommandRequest : принимает
+CommandController --> CommandResponse : возвращает
+
+CommandApplicationService --> DeviceManagementClient : проверяет устройство\nи capabilities
+CommandApplicationService --> CommandRepository : сохраняет и читает команды
+CommandApplicationService --> CommandEventPublisher : публикует сохранённую команду
+CommandApplicationService --> DeviceCommand : создаёт
+
+HttpDeviceManagementClient ..|> DeviceManagementClient
+PostgreSQLCommandRepository ..|> CommandRepository
+KafkaCommandPublisher ..|> CommandEventPublisher
+
+KafkaCommandPublisher --> DeviceCommandMessage : публикует
+KafkaCommandStatusConsumer --> CommandStatusChangedEvent : получает
+KafkaCommandStatusConsumer --> CommandRepository : обновляет статус\nи историю
+
+DeviceCommand --> CommandStatus
+CommandStatusHistory --> CommandStatus
+DeviceCommand "1" o-- "0..*" CommandStatusHistory : история статусов
+CommandRepository --> DeviceCommand
+CommandRepository --> CommandStatusHistory
+
+note right of KafkaCommandPublisher
+  Topic:
+  smart-home.device.commands.v1
+end note
+
+note right of KafkaCommandStatusConsumer
+  Topic:
+  smart-home.device.command-status.v1
+end note
+
+note bottom of CommandApplicationService
+  Валидация команды входит в application service:
+  1. проверка существования устройства;
+  2. проверка capability;
+  3. проверка параметров;
+  4. создание команды со статусом PENDING;
+  5. сохранение и публикация в Kafka.
+end note
+
+note bottom of PostgreSQLCommandRepository
+  UpdateStatus обновляет текущий статус команды
+  и добавляет запись в историю статусов
+  в рамках одной транзакции.
+end note
+
+@enduml
