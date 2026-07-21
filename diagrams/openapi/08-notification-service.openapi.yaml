@@ -1,8 +1,8 @@
 openapi: 3.1.1
 info:
   title: Notification Service API
-  version: 1.0.0
-  description: Настройки каналов доставки и чтение истории уведомлений.
+  version: 1.1.0
+  description: Настройки уведомлений, история сообщений, попытки доставки и повторная отправка через внешнего провайдера.
 servers:
 - url: https://api.smart-home.example.com/notifications/v1
   description: Доступ через API Gateway
@@ -55,6 +55,30 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Limit'
       - $ref: '#/components/parameters/Offset'
+      - name: eventType
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - CREATED
+          - PROCESSING
+          - DELIVERED
+          - FAILED
+      - name: channel
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - PUSH
+          - EMAIL
+          - SMS
       responses:
         '200':
           description: Уведомления
@@ -69,7 +93,7 @@ paths:
     - name: notificationId
       in: path
       required: true
-      schema: &id001
+      schema:
         type: string
         format: uuid
     get:
@@ -90,7 +114,9 @@ paths:
     - name: notificationId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     post:
       tags:
       - Notifications
@@ -148,7 +174,9 @@ components:
       - channel
       - enabled
       properties:
-        id: *id001
+        id:
+          type: string
+          format: uuid
         eventType:
           type: string
         channel:
@@ -175,7 +203,9 @@ components:
       - channel
       - status
       properties:
-        id: *id001
+        id:
+          type: string
+          format: uuid
         channel:
           type: string
           enum:
@@ -190,11 +220,21 @@ components:
           - FAILED
         sentAt:
           oneOf:
-          - &id002
-            type: string
+          - type: string
             format: date-time
           - type: 'null'
         errorMessage:
+          type:
+          - string
+          - 'null'
+        recipient:
+          type:
+          - string
+          - 'null'
+        attemptedAt:
+          type: string
+          format: date-time
+        providerMessageId:
           type:
           - string
           - 'null'
@@ -207,7 +247,9 @@ components:
       - createdAt
       - deliveries
       properties:
-        id: *id001
+        id:
+          type: string
+          format: uuid
         eventType:
           type: string
         payload:
@@ -220,11 +262,23 @@ components:
           - PROCESSING
           - DELIVERED
           - FAILED
-        createdAt: *id002
+        createdAt:
+          type: string
+          format: date-time
         deliveries:
           type: array
           items:
             $ref: '#/components/schemas/NotificationDelivery'
+        sourceEventId:
+          oneOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+        templateId:
+          oneOf:
+          - type: string
+            format: uuid
+          - type: 'null'
   responses:
     BadRequest:
       description: Некорректный запрос

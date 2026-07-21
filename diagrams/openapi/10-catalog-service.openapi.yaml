@@ -1,8 +1,8 @@
 openapi: 3.1.1
 info:
   title: Catalog Service API
-  version: 1.0.0
-  description: Каталог устройств, модулей, комплектов и правил совместимости.
+  version: 1.1.0
+  description: Получение и административное управление устройствами, модулями, комплектами, публикацией и совместимостью.
 servers:
 - url: https://api.smart-home.example.com/catalog/v1
   description: Доступ через API Gateway
@@ -43,12 +43,33 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/CatalogItem'
+    post:
+      tags:
+      - Catalog
+      summary: Создать элемент каталога
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCatalogItemRequest'
+      responses:
+        '201':
+          description: Элемент создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /catalog/items/{itemId}:
     parameters:
     - name: itemId
       in: path
       required: true
-      schema: &id001
+      schema:
         type: string
         format: uuid
     get:
@@ -64,12 +85,44 @@ paths:
                 $ref: '#/components/schemas/CatalogItem'
         '404':
           $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Catalog
+      summary: Изменить элемент каталога
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCatalogItemRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Catalog
+      summary: Удалить элемент каталога
+      responses:
+        '204':
+          description: Элемент удалён
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /catalog/items/{itemId}/compatibility:
     parameters:
     - name: itemId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     get:
       tags:
       - Compatibility
@@ -83,6 +136,27 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Compatibility'
+    post:
+      tags:
+      - Compatibility
+      summary: Добавить правило совместимости
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCompatibilityRequest'
+      responses:
+        '201':
+          description: Правило создано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Compatibility'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /catalog/bundles:
     get:
       tags:
@@ -97,12 +171,33 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Bundle'
+    post:
+      tags:
+      - Bundles
+      summary: Создать комплект
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBundleRequest'
+      responses:
+        '201':
+          description: Комплект создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bundle'
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /catalog/bundles/{bundleId}:
     parameters:
     - name: bundleId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     get:
       tags:
       - Bundles
@@ -114,6 +209,70 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Bundle'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Bundles
+      summary: Изменить комплект
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBundleRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bundle'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Bundles
+      summary: Удалить комплект
+      responses:
+        '204':
+          description: Комплект удалён
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /catalog/compatibility/{compatibilityId}:
+    parameters:
+    - name: compatibilityId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    patch:
+      tags:
+      - Compatibility
+      summary: Изменить правило совместимости
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCompatibilityRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Compatibility'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Compatibility
+      summary: Удалить правило совместимости
+      responses:
+        '204':
+          description: Правило удалено
         '404':
           $ref: '#/components/responses/NotFound'
 components:
@@ -165,12 +324,15 @@ components:
       - sku
       - name
       - itemType
-      - active
+      - publicationStatus
       properties:
-        id: *id001
+        id:
+          type: string
+          format: uuid
         deviceModelId:
           oneOf:
-          - *id001
+          - type: string
+            format: uuid
           - type: 'null'
         sku:
           type: string
@@ -186,8 +348,25 @@ components:
           type:
           - string
           - 'null'
-        active:
-          type: boolean
+        connectionParameters:
+          type: object
+          additionalProperties: true
+        publicationStatus:
+          type: string
+          enum:
+          - DRAFT
+          - PUBLISHED
+          - ARCHIVED
+        createdAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        updatedAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
     BundleItem:
       type: object
       required:
@@ -204,22 +383,38 @@ components:
       required:
       - id
       - name
-      - active
+      - publicationStatus
       - items
       properties:
-        id: *id001
+        id:
+          type: string
+          format: uuid
         name:
           type: string
         description:
           type:
           - string
           - 'null'
-        active:
-          type: boolean
         items:
           type: array
           items:
             $ref: '#/components/schemas/BundleItem'
+        publicationStatus:
+          type: string
+          enum:
+          - DRAFT
+          - PUBLISHED
+          - ARCHIVED
+        createdAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        updatedAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
     Compatibility:
       type: object
       required:
@@ -227,8 +422,153 @@ components:
       - targetItemId
       - relationType
       properties:
-        sourceItemId: *id001
-        targetItemId: *id001
+        sourceItemId:
+          type: string
+          format: uuid
+        targetItemId:
+          type: string
+          format: uuid
+        relationType:
+          type: string
+          enum:
+          - COMPATIBLE
+          - REQUIRES
+          - INCOMPATIBLE
+        notes:
+          type:
+          - string
+          - 'null'
+    CreateCatalogItemRequest:
+      type: object
+      required:
+      - sku
+      - name
+      - itemType
+      properties:
+        deviceModelId:
+          oneOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+        sku:
+          type: string
+        name:
+          type: string
+        itemType:
+          type: string
+          enum:
+          - DEVICE
+          - MODULE
+          - ACCESSORY
+        description:
+          type:
+          - string
+          - 'null'
+        connectionParameters:
+          type: object
+          additionalProperties: true
+        publicationStatus:
+          type: string
+          enum:
+          - DRAFT
+          - PUBLISHED
+          - ARCHIVED
+          default: DRAFT
+    UpdateCatalogItemRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+        connectionParameters:
+          type: object
+          additionalProperties: true
+        publicationStatus:
+          type: string
+          enum:
+          - DRAFT
+          - PUBLISHED
+          - ARCHIVED
+    BundleItemRequest:
+      type: object
+      required:
+      - catalogItemId
+      - quantity
+      properties:
+        catalogItemId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+    CreateBundleRequest:
+      type: object
+      required:
+      - name
+      - items
+      properties:
+        name:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+        publicationStatus:
+          type: string
+          enum:
+          - DRAFT
+          - PUBLISHED
+          - ARCHIVED
+          default: DRAFT
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/BundleItemRequest'
+    UpdateBundleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+        publicationStatus:
+          type: string
+          enum:
+          - DRAFT
+          - PUBLISHED
+          - ARCHIVED
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BundleItemRequest'
+    CreateCompatibilityRequest:
+      type: object
+      required:
+      - targetItemId
+      - relationType
+      properties:
+        targetItemId:
+          type: string
+          format: uuid
+        relationType:
+          type: string
+          enum:
+          - COMPATIBLE
+          - REQUIRES
+          - INCOMPATIBLE
+        notes:
+          type:
+          - string
+          - 'null'
+    UpdateCompatibilityRequest:
+      type: object
+      properties:
         relationType:
           type: string
           enum:

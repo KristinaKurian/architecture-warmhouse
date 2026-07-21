@@ -1,8 +1,8 @@
 openapi: 3.1.1
 info:
   title: Video Service API
-  version: 1.0.0
-  description: Управление камерами, доступ к видеопотокам, снимкам и архиву.
+  version: 1.1.0
+  description: Подключение камер, выдача доступа к потокам, создание снимков и чтение метаданных видеоархива.
 servers:
 - url: https://api.smart-home.example.com/video/v1
   description: Доступ через API Gateway
@@ -24,7 +24,7 @@ paths:
       parameters:
       - name: houseId
         in: query
-        schema: &id001
+        schema:
           type: string
           format: uuid
       responses:
@@ -58,7 +58,9 @@ paths:
     - name: cameraId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     get:
       tags:
       - Cameras
@@ -70,12 +72,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Camera'
+    patch:
+      tags:
+      - Cameras
+      summary: Изменить настройки камеры
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCameraRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Camera'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Cameras
+      summary: Отключить камеру
+      responses:
+        '204':
+          description: Камера отключена
+        '404':
+          $ref: '#/components/responses/NotFound'
   /cameras/{cameraId}/stream:
     parameters:
     - name: cameraId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     get:
       tags:
       - Streams
@@ -87,12 +119,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StreamAccess'
+      description: Возвращает временную ссылку доступа к активному потоку.
   /cameras/{cameraId}/snapshots:
     parameters:
     - name: cameraId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     post:
       tags:
       - Snapshots
@@ -104,12 +139,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Snapshot'
+    get:
+      tags:
+      - Snapshots
+      summary: Получить снимки камеры
+      parameters:
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        '200':
+          description: Снимки камеры
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Snapshot'
   /cameras/{cameraId}/recordings:
     parameters:
     - name: cameraId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     get:
       tags:
       - Recordings
@@ -117,12 +180,14 @@ paths:
       parameters:
       - name: from
         in: query
-        schema: &id002
+        schema:
           type: string
           format: date-time
       - name: to
         in: query
-        schema: *id002
+        schema:
+          type: string
+          format: date-time
       responses:
         '200':
           description: Записи
@@ -132,6 +197,48 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Recording'
+  /cameras/{cameraId}/streams:
+    parameters:
+    - name: cameraId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Streams
+      summary: Получить метаданные потоков камеры
+      responses:
+        '200':
+          description: Потоки камеры
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VideoStream'
+  /recordings/{recordingId}:
+    parameters:
+    - name: recordingId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Recordings
+      summary: Получить метаданные видеозаписи
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recording'
+        '404':
+          $ref: '#/components/responses/NotFound'
 components:
   securitySchemes:
     bearerAuth:
@@ -183,9 +290,15 @@ components:
       - name
       - status
       properties:
-        id: *id001
-        deviceId: *id001
-        houseId: *id001
+        id:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        houseId:
+          type: string
+          format: uuid
         name:
           type: string
         status:
@@ -194,6 +307,21 @@ components:
           - ONLINE
           - OFFLINE
           - UNAVAILABLE
+        roomId:
+          oneOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+        createdAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        updatedAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
     CreateCameraRequest:
       type: object
       required:
@@ -201,10 +329,19 @@ components:
       - houseId
       - name
       properties:
-        deviceId: *id001
-        houseId: *id001
+        deviceId:
+          type: string
+          format: uuid
+        houseId:
+          type: string
+          format: uuid
         name:
           type: string
+        roomId:
+          oneOf:
+          - type: string
+            format: uuid
+          - type: 'null'
     StreamAccess:
       type: object
       required:
@@ -219,7 +356,9 @@ components:
           enum:
           - HLS
           - WEBRTC
-        expiresAt: *id002
+        expiresAt:
+          type: string
+          format: date-time
     Snapshot:
       type: object
       required:
@@ -228,12 +367,18 @@ components:
       - url
       - capturedAt
       properties:
-        id: *id001
-        cameraId: *id001
+        id:
+          type: string
+          format: uuid
+        cameraId:
+          type: string
+          format: uuid
         url:
           type: string
           format: uri
-        capturedAt: *id002
+        capturedAt:
+          type: string
+          format: date-time
     Recording:
       type: object
       required:
@@ -241,12 +386,19 @@ components:
       - cameraId
       - startedAt
       properties:
-        id: *id001
-        cameraId: *id001
-        startedAt: *id002
+        id:
+          type: string
+          format: uuid
+        cameraId:
+          type: string
+          format: uuid
+        startedAt:
+          type: string
+          format: date-time
         endedAt:
           oneOf:
-          - *id002
+          - type: string
+            format: date-time
           - type: 'null'
         sizeBytes:
           type:
@@ -258,6 +410,55 @@ components:
           - string
           - 'null'
           format: uri
+    UpdateCameraRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        houseId:
+          type: string
+          format: uuid
+        roomId:
+          oneOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+    VideoStream:
+      type: object
+      required:
+      - id
+      - cameraId
+      - protocol
+      - status
+      properties:
+        id:
+          type: string
+          format: uuid
+        cameraId:
+          type: string
+          format: uuid
+        protocol:
+          type: string
+          enum:
+          - HLS
+          - WEBRTC
+          - RTSP
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - INACTIVE
+          - ERROR
+        accessUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+        expiresAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
   responses:
     BadRequest:
       description: Некорректный запрос

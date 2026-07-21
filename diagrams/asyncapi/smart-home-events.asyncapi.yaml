@@ -1,9 +1,9 @@
 asyncapi: 3.1.0
 info:
   title: Smart Home Event API
-  version: 1.0.0
-  description: Событийные контракты микросервисов Smart Home. Внутренний брокер — Kafka; интеграция с физическими устройствами
-    выполняется через Partner Integration Service и протокольные адаптеры.
+  version: 1.1.0
+  description: Событийные контракты обновлённой микросервисной архитектуры Smart Home. Kafka используется для команд, статусов
+    выполнения, телеметрии и доменных событий; сценарии создают команды через REST API Device Command Service.
 defaultContentType: application/json
 servers:
   productionKafka:
@@ -57,6 +57,7 @@ operations:
       $ref: '#/channels/deviceCommands'
     messages:
     - $ref: '#/channels/deviceCommands/messages/deviceCommand'
+    description: Device Command Service публикует команду
   partnerServiceReceivesDeviceCommand:
     action: receive
     summary: Partner Integration Service получает команду для доставки
@@ -64,6 +65,7 @@ operations:
       $ref: '#/channels/deviceCommands'
     messages:
     - $ref: '#/channels/deviceCommands/messages/deviceCommand'
+    description: Partner Integration Service получает команду для доставки
   partnerServiceSendsCommandStatus:
     action: send
     summary: Partner Integration Service публикует результат команды
@@ -71,6 +73,7 @@ operations:
       $ref: '#/channels/commandStatus'
     messages:
     - $ref: '#/channels/commandStatus/messages/commandStatusChanged'
+    description: Partner Integration Service публикует результат команды
   commandServiceReceivesCommandStatus:
     action: receive
     summary: Device Command Service обновляет историю статусов
@@ -78,6 +81,7 @@ operations:
       $ref: '#/channels/commandStatus'
     messages:
     - $ref: '#/channels/commandStatus/messages/commandStatusChanged'
+    description: Device Command Service обновляет историю статусов
   partnerServiceSendsTelemetry:
     action: send
     summary: Partner Integration Service публикует телеметрию
@@ -85,6 +89,7 @@ operations:
       $ref: '#/channels/telemetryReadings'
     messages:
     - $ref: '#/channels/telemetryReadings/messages/telemetryReading'
+    description: Partner Integration Service публикует телеметрию
   telemetryServiceReceivesTelemetry:
     action: receive
     summary: Telemetry Service сохраняет телеметрию
@@ -92,6 +97,7 @@ operations:
       $ref: '#/channels/telemetryReadings'
     messages:
     - $ref: '#/channels/telemetryReadings/messages/telemetryReading'
+    description: Telemetry Service сохраняет телеметрию
   telemetryServiceSendsStateChanged:
     action: send
     summary: Telemetry Service публикует изменение состояния
@@ -99,20 +105,23 @@ operations:
       $ref: '#/channels/deviceStateChanged'
     messages:
     - $ref: '#/channels/deviceStateChanged/messages/deviceStateChanged'
+    description: Telemetry Service публикует изменение состояния
   scenarioServiceReceivesStateChanged:
     action: receive
-    summary: Scenario Service проверяет условия сценариев
+    summary: Scenario Service проверяет условия и формирует действия сценариев
     channel:
       $ref: '#/channels/deviceStateChanged'
     messages:
     - $ref: '#/channels/deviceStateChanged/messages/deviceStateChanged'
+    description: Scenario Service проверяет условия и формирует действия сценариев
   notificationServiceReceivesStateChanged:
     action: receive
-    summary: Notification Service формирует пользовательские уведомления
+    summary: Notification Service формирует уведомления об изменении состояния
     channel:
       $ref: '#/channels/deviceStateChanged'
     messages:
     - $ref: '#/channels/deviceStateChanged/messages/deviceStateChanged'
+    description: Notification Service формирует уведомления об изменении состояния
   deviceServiceSendsStatusChanged:
     action: send
     summary: Device Management Service публикует доступность устройства
@@ -120,6 +129,7 @@ operations:
       $ref: '#/channels/deviceStatusChanged'
     messages:
     - $ref: '#/channels/deviceStatusChanged/messages/deviceStatusChanged'
+    description: Device Management Service публикует доступность устройства
   notificationServiceReceivesDeviceStatus:
     action: receive
     summary: Notification Service обрабатывает недоступность устройства
@@ -127,6 +137,7 @@ operations:
       $ref: '#/channels/deviceStatusChanged'
     messages:
     - $ref: '#/channels/deviceStatusChanged/messages/deviceStatusChanged'
+    description: Notification Service обрабатывает недоступность устройства
   scenarioServiceSendsExecutionResult:
     action: send
     summary: Scenario Service публикует результат сценария
@@ -134,6 +145,7 @@ operations:
       $ref: '#/channels/scenarioExecuted'
     messages:
     - $ref: '#/channels/scenarioExecuted/messages/scenarioExecuted'
+    description: Scenario Service публикует результат сценария
   notificationServiceReceivesScenarioResult:
     action: receive
     summary: Notification Service уведомляет о результате сценария
@@ -141,6 +153,15 @@ operations:
       $ref: '#/channels/scenarioExecuted'
     messages:
     - $ref: '#/channels/scenarioExecuted/messages/scenarioExecuted'
+    description: Notification Service уведомляет о результате сценария
+  notificationServiceReceivesCommandStatus:
+    action: receive
+    summary: Notification Service обрабатывает результат выполнения команды
+    channel:
+      $ref: '#/channels/commandStatus'
+    messages:
+    - $ref: '#/channels/commandStatus/messages/commandStatusChanged'
+    description: Notification Service обрабатывает результат выполнения команды
 components:
   securitySchemes:
     saslScram:
@@ -199,7 +220,7 @@ components:
       - occurredAt
       - producer
       properties:
-        eventId: &id001
+        eventId:
           type: string
           format: uuid
         eventType:
@@ -207,7 +228,7 @@ components:
         eventVersion:
           type: integer
           minimum: 1
-        occurredAt: &id002
+        occurredAt:
           type: string
           format: date-time
         producer:
@@ -226,8 +247,12 @@ components:
         - commandType
         - parameters
         properties:
-          commandId: *id001
-          deviceId: *id001
+          commandId:
+            type: string
+            format: uuid
+          deviceId:
+            type: string
+            format: uuid
           commandType:
             type: string
           parameters:
@@ -235,12 +260,18 @@ components:
             additionalProperties: true
           requestedByUserId:
             oneOf:
-            - *id001
+            - type: string
+              format: uuid
             - type: 'null'
           scenarioId:
             oneOf:
-            - *id001
+            - type: string
+              format: uuid
             - type: 'null'
+          idempotencyKey:
+            type:
+            - string
+            - 'null'
     CommandStatusChangedPayload:
       allOf:
       - $ref: '#/components/schemas/EventMetadata'
@@ -250,8 +281,12 @@ components:
         - deviceId
         - status
         properties:
-          commandId: *id001
-          deviceId: *id001
+          commandId:
+            type: string
+            format: uuid
+          deviceId:
+            type: string
+            format: uuid
           status:
             type: string
             enum:
@@ -261,6 +296,21 @@ components:
           details:
             type: object
             additionalProperties: true
+          requestedByUserId:
+            oneOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          scenarioId:
+            oneOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          houseId:
+            oneOf:
+            - type: string
+              format: uuid
+            - type: 'null'
     TelemetryReadingPayload:
       allOf:
       - $ref: '#/components/schemas/EventMetadata'
@@ -271,10 +321,12 @@ components:
         - value
         - measuredAt
         properties:
-          deviceId: *id001
+          deviceId:
+            type: string
+            format: uuid
           metricCode:
             type: string
-          value: &id003
+          value:
             description: Произвольное JSON-значение
             oneOf:
             - type: string
@@ -290,7 +342,14 @@ components:
             type:
             - string
             - 'null'
-          measuredAt: *id002
+          measuredAt:
+            type: string
+            format: date-time
+          houseId:
+            oneOf:
+            - type: string
+              format: uuid
+            - type: 'null'
     DeviceStateChangedPayload:
       allOf:
       - $ref: '#/components/schemas/EventMetadata'
@@ -301,17 +360,55 @@ components:
         - value
         - measuredAt
         properties:
-          deviceId: *id001
-          metricId: *id001
+          deviceId:
+            type: string
+            format: uuid
+          metricId:
+            type: string
+            format: uuid
           metricCode:
             type: string
-          previousValue: *id003
-          value: *id003
+          previousValue:
+            description: Произвольное JSON-значение
+            oneOf:
+            - type: string
+            - type: number
+            - type: integer
+            - type: boolean
+            - type: object
+              additionalProperties: true
+            - type: array
+              items: {}
+            - type: 'null'
+          value:
+            description: Произвольное JSON-значение
+            oneOf:
+            - type: string
+            - type: number
+            - type: integer
+            - type: boolean
+            - type: object
+              additionalProperties: true
+            - type: array
+              items: {}
+            - type: 'null'
           unit:
             type:
             - string
             - 'null'
-          measuredAt: *id002
+          measuredAt:
+            type: string
+            format: date-time
+          houseId:
+            oneOf:
+            - type: string
+              format: uuid
+            - type: 'null'
+          roomId:
+            oneOf:
+            - type: string
+              format: uuid
+            - type: 'null'
     DeviceStatusChangedPayload:
       allOf:
       - $ref: '#/components/schemas/EventMetadata'
@@ -320,7 +417,9 @@ components:
         - deviceId
         - status
         properties:
-          deviceId: *id001
+          deviceId:
+            type: string
+            format: uuid
           status:
             type: string
             enum:
@@ -329,7 +428,13 @@ components:
             - UNAVAILABLE
           lastSeenAt:
             oneOf:
-            - *id002
+            - type: string
+              format: date-time
+            - type: 'null'
+          houseId:
+            oneOf:
+            - type: string
+              format: uuid
             - type: 'null'
     ScenarioExecutedPayload:
       allOf:
@@ -342,19 +447,28 @@ components:
         - status
         - triggeredAt
         properties:
-          scenarioId: *id001
-          houseId: *id001
-          executionId: *id001
+          scenarioId:
+            type: string
+            format: uuid
+          houseId:
+            type: string
+            format: uuid
+          executionId:
+            type: string
+            format: uuid
           status:
             type: string
             enum:
             - COMPLETED
             - FAILED
             - SKIPPED
-          triggeredAt: *id002
+          triggeredAt:
+            type: string
+            format: date-time
           finishedAt:
             oneOf:
-            - *id002
+            - type: string
+              format: date-time
             - type: 'null'
           errorMessage:
             type:

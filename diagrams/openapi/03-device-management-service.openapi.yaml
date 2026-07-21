@@ -1,8 +1,8 @@
 openapi: 3.1.1
 info:
   title: Device Management Service API
-  version: 1.0.0
-  description: Регистрация, настройка, учёт и привязка устройств, а также предоставление capabilities.
+  version: 1.1.0
+  description: Регистрация и жизненный цикл устройств, привязки к дому, метаданные, capabilities и статусы доступности.
 servers:
 - url: https://api.smart-home.example.com/devices/v1
   description: Доступ через API Gateway
@@ -13,6 +13,9 @@ security:
 tags:
 - name: Devices
 - name: Bindings
+- name: Status
+- name: Models
+- name: Manufacturers
 - name: Capabilities
 paths:
   /devices:
@@ -23,7 +26,7 @@ paths:
       parameters:
       - name: houseId
         in: query
-        schema: &id001
+        schema:
           type: string
           format: uuid
       - name: status
@@ -63,7 +66,9 @@ paths:
     - name: deviceId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     get:
       tags:
       - Devices
@@ -94,12 +99,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Device'
+    delete:
+      tags:
+      - Devices
+      summary: Удалить устройство
+      responses:
+        '204':
+          description: Устройство удалено
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /devices/{deviceId}/bindings:
     parameters:
     - name: deviceId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     post:
       tags:
       - Bindings
@@ -119,12 +137,27 @@ paths:
                 $ref: '#/components/schemas/DeviceBinding'
         '409':
           $ref: '#/components/responses/Conflict'
+    get:
+      tags:
+      - Bindings
+      summary: Получить историю привязок устройства
+      responses:
+        '200':
+          description: История привязок
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeviceBinding'
   /devices/{deviceId}/capabilities:
     parameters:
     - name: deviceId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     get:
       tags:
       - Capabilities
@@ -138,6 +171,132 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Capability'
+  /devices/{deviceId}/bindings/{bindingId}:
+    parameters:
+    - name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: bindingId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    delete:
+      tags:
+      - Bindings
+      summary: Отвязать устройство от дома или помещения
+      responses:
+        '204':
+          description: Привязка завершена
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /devices/{deviceId}/status:
+    parameters:
+    - name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Status
+      summary: Получить статус устройства
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Status
+      summary: Обновить статус устройства
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDeviceStatusRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceStatus'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /device-models:
+    get:
+      tags:
+      - Models
+      summary: Получить модели устройств
+      parameters:
+      - name: manufacturerId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: deviceType
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Модели устройств
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeviceModel'
+  /device-models/{modelId}:
+    parameters:
+    - name: modelId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Models
+      summary: Получить модель устройства
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceModel'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /manufacturers:
+    get:
+      tags:
+      - Manufacturers
+      summary: Получить производителей устройств
+      responses:
+        '200':
+          description: Производители
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Manufacturer'
 components:
   securitySchemes:
     bearerAuth:
@@ -217,8 +376,12 @@ components:
       - status
       - registeredAt
       properties:
-        id: *id001
-        modelId: *id001
+        id:
+          type: string
+          format: uuid
+        modelId:
+          type: string
+          format: uuid
         serialNumber:
           type: string
         status:
@@ -228,17 +391,31 @@ components:
           - OFFLINE
           - UNAVAILABLE
           - PAIRING
-        registeredAt: &id002
+        registeredAt:
           type: string
           format: date-time
         lastSeenAt:
           oneOf:
-          - *id002
+          - type: string
+            format: date-time
           - type: 'null'
         capabilities:
           type: array
           items:
             $ref: '#/components/schemas/Capability'
+        displayName:
+          type:
+          - string
+          - 'null'
+        currentBinding:
+          oneOf:
+          - $ref: '#/components/schemas/DeviceBinding'
+          - type: 'null'
+        updatedAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
     RegisterDeviceRequest:
       type: object
       required:
@@ -248,14 +425,18 @@ components:
       properties:
         serialNumber:
           type: string
-        modelId: *id001
+        modelId:
+          type: string
+          format: uuid
         pairingToken:
           type: string
     UpdateDeviceRequest:
       type: object
       properties:
         displayName:
-          type: string
+          type:
+          - string
+          - 'null'
         status:
           type: string
           enum:
@@ -267,14 +448,18 @@ components:
       required:
       - houseId
       properties:
-        houseId: *id001
+        houseId:
+          type: string
+          format: uuid
         roomId:
           oneOf:
-          - *id001
+          - type: string
+            format: uuid
           - type: 'null'
         zoneId:
           oneOf:
-          - *id001
+          - type: string
+            format: uuid
           - type: 'null'
     DeviceBinding:
       type: object
@@ -284,22 +469,119 @@ components:
       - houseId
       - boundAt
       properties:
-        id: *id001
-        deviceId: *id001
-        houseId: *id001
+        id:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        houseId:
+          type: string
+          format: uuid
         roomId:
           oneOf:
-          - *id001
+          - type: string
+            format: uuid
           - type: 'null'
         zoneId:
           oneOf:
-          - *id001
+          - type: string
+            format: uuid
           - type: 'null'
-        boundAt: *id002
+        boundAt:
+          type: string
+          format: date-time
         unboundAt:
           oneOf:
-          - *id002
+          - type: string
+            format: date-time
           - type: 'null'
+    DeviceStatus:
+      type: object
+      required:
+      - deviceId
+      - status
+      properties:
+        deviceId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - ONLINE
+          - OFFLINE
+          - UNAVAILABLE
+          - PAIRING
+        lastSeenAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        updatedAt:
+          type: string
+          format: date-time
+    UpdateDeviceStatusRequest:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - ONLINE
+          - OFFLINE
+          - UNAVAILABLE
+        lastSeenAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+    Manufacturer:
+      type: object
+      required:
+      - id
+      - name
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        website:
+          type:
+          - string
+          - 'null'
+          format: uri
+    DeviceModel:
+      type: object
+      required:
+      - id
+      - manufacturerId
+      - name
+      - deviceType
+      - protocol
+      - capabilities
+      properties:
+        id:
+          type: string
+          format: uuid
+        manufacturerId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        deviceType:
+          type: string
+        protocol:
+          type: string
+        firmwareVersion:
+          type:
+          - string
+          - 'null'
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Capability'
   responses:
     BadRequest:
       description: Некорректный запрос

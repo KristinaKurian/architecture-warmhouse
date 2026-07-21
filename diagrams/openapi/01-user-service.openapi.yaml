@@ -1,8 +1,8 @@
 openapi: 3.1.1
 info:
   title: User Service API
-  version: 1.0.0
-  description: Регистрация, аутентификация, профили, роли и права пользователей.
+  version: 1.1.0
+  description: Регистрация, аутентификация, управление сессиями, профилями, ролями и правами пользователей.
 servers:
 - url: https://api.smart-home.example.com/users/v1
   description: Доступ через API Gateway
@@ -12,7 +12,9 @@ security:
 - bearerAuth: []
 tags:
 - name: Authentication
+- name: Sessions
 - name: Users
+- name: Roles
 paths:
   /auth/register:
     post:
@@ -121,7 +123,7 @@ paths:
       - name: userId
         in: path
         required: true
-        schema: &id001
+        schema:
           type: string
           format: uuid
       responses:
@@ -133,6 +135,111 @@ paths:
                 $ref: '#/components/schemas/User'
         '404':
           $ref: '#/components/responses/NotFound'
+  /auth/logout:
+    post:
+      tags:
+      - Authentication
+      summary: Завершить текущую сессию
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '204':
+          description: Сессия завершена
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /sessions:
+    get:
+      tags:
+      - Sessions
+      summary: Получить активные сессии текущего пользователя
+      responses:
+        '200':
+          description: Список активных сессий
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Session'
+  /sessions/{sessionId}:
+    parameters:
+    - name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    delete:
+      tags:
+      - Sessions
+      summary: Завершить выбранную сессию
+      responses:
+        '204':
+          description: Сессия завершена
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /roles:
+    get:
+      tags:
+      - Roles
+      summary: Получить доступные роли
+      responses:
+        '200':
+          description: Список ролей
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Role'
+  /users/{userId}/roles:
+    parameters:
+    - name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Roles
+      summary: Получить роли пользователя
+      responses:
+        '200':
+          description: Роли пользователя
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Role'
+    put:
+      tags:
+      - Roles
+      summary: Назначить набор ролей пользователю
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignRolesRequest'
+      responses:
+        '200':
+          description: Назначенные роли
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Role'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 components:
   securitySchemes:
     bearerAuth:
@@ -191,6 +298,11 @@ components:
         fullName:
           type: string
           maxLength: 255
+        phone:
+          type: string
+        locale:
+          type: string
+          example: ru-RU
     LoginRequest:
       type: object
       required:
@@ -235,7 +347,9 @@ components:
       - status
       - createdAt
       properties:
-        id: *id001
+        id:
+          type: string
+          format: uuid
         email:
           type: string
           format: email
@@ -252,20 +366,115 @@ components:
         roles:
           type: array
           items:
-            type: string
-        createdAt: &id002
+            $ref: '#/components/schemas/Role'
+        createdAt:
           type: string
           format: date-time
         updatedAt:
           oneOf:
-          - *id002
+          - type: string
+            format: date-time
           - type: 'null'
+        phone:
+          type:
+          - string
+          - 'null'
+        locale:
+          type:
+          - string
+          - 'null'
+        settings:
+          type: object
+          additionalProperties: true
     UpdateUserRequest:
       type: object
       properties:
         fullName:
           type: string
           maxLength: 255
+        phone:
+          type:
+          - string
+          - 'null'
+        locale:
+          type: string
+        settings:
+          type: object
+          additionalProperties: true
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - BLOCKED
+          - PENDING
+    LogoutRequest:
+      type: object
+      required:
+      - refreshToken
+      properties:
+        refreshToken:
+          type: string
+    Session:
+      type: object
+      required:
+      - id
+      - createdAt
+      - expiresAt
+      - revoked
+      properties:
+        id:
+          type: string
+          format: uuid
+        userAgent:
+          type:
+          - string
+          - 'null'
+        ipAddress:
+          type:
+          - string
+          - 'null'
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          oneOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        revoked:
+          type: boolean
+    Role:
+      type: object
+      required:
+      - id
+      - code
+      - name
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+    AssignRolesRequest:
+      type: object
+      required:
+      - roleIds
+      properties:
+        roleIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
   responses:
     BadRequest:
       description: Некорректный запрос

@@ -1,8 +1,8 @@
 openapi: 3.1.1
 info:
   title: Scenario Service API
-  version: 1.0.0
-  description: Создание сценариев автоматизации, управление условиями, действиями и просмотр запусков.
+  version: 1.1.0
+  description: Управление сценариями, обработка событий состояния, проверка условий, формирование действий и история запусков.
 servers:
 - url: https://api.smart-home.example.com/scenarios/v1
   description: Доступ через API Gateway
@@ -22,7 +22,7 @@ paths:
       parameters:
       - name: houseId
         in: query
-        schema: &id001
+        schema:
           type: string
           format: uuid
       responses:
@@ -56,7 +56,9 @@ paths:
     - name: scenarioId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     get:
       tags:
       - Scenarios
@@ -94,12 +96,35 @@ paths:
       responses:
         '204':
           description: Сценарий удалён
+    patch:
+      tags:
+      - Scenarios
+      summary: Частично изменить сценарий
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateScenarioRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Scenario'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '400':
+          $ref: '#/components/responses/BadRequest'
   /scenarios/{scenarioId}/enable:
     parameters:
     - name: scenarioId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     post:
       tags:
       - Scenarios
@@ -116,7 +141,9 @@ paths:
     - name: scenarioId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     post:
       tags:
       - Scenarios
@@ -133,7 +160,9 @@ paths:
     - name: scenarioId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     get:
       tags:
       - Executions
@@ -147,6 +176,29 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/ScenarioExecution'
+  /scenarios/{scenarioId}/execute:
+    parameters:
+    - name: scenarioId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      tags:
+      - Executions
+      summary: Запустить сценарий вручную для проверки
+      responses:
+        '202':
+          description: Запуск принят
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScenarioExecution'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
 components:
   securitySchemes:
     bearerAuth:
@@ -198,7 +250,8 @@ components:
       properties:
         metricId:
           oneOf:
-          - *id001
+          - type: string
+            format: uuid
           - type: 'null'
         eventType:
           type: string
@@ -236,7 +289,9 @@ components:
       - parameters
       - orderNo
       properties:
-        deviceId: *id001
+        deviceId:
+          type: string
+          format: uuid
         commandType:
           type: string
           example: heating.set
@@ -257,8 +312,12 @@ components:
       - actions
       - createdAt
       properties:
-        id: *id001
-        houseId: *id001
+        id:
+          type: string
+          format: uuid
+        houseId:
+          type: string
+          format: uuid
         name:
           type: string
         enabled:
@@ -271,12 +330,13 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ScenarioAction'
-        createdAt: &id002
+        createdAt:
           type: string
           format: date-time
         updatedAt:
           oneOf:
-          - *id002
+          - type: string
+            format: date-time
           - type: 'null'
     CreateScenarioRequest:
       type: object
@@ -286,7 +346,9 @@ components:
       - conditions
       - actions
       properties:
-        houseId: *id001
+        houseId:
+          type: string
+          format: uuid
         name:
           type: string
         enabled:
@@ -310,8 +372,12 @@ components:
       - status
       - triggeredAt
       properties:
-        id: *id001
-        scenarioId: *id001
+        id:
+          type: string
+          format: uuid
+        scenarioId:
+          type: string
+          format: uuid
         status:
           type: string
           enum:
@@ -321,17 +387,24 @@ components:
           - SKIPPED
         triggerEventId:
           oneOf:
-          - *id001
+          - type: string
+            format: uuid
           - type: 'null'
-        triggeredAt: *id002
+        triggeredAt:
+          type: string
+          format: date-time
         finishedAt:
           oneOf:
-          - *id002
+          - type: string
+            format: date-time
           - type: 'null'
         errorMessage:
           type:
           - string
           - 'null'
+        triggerPayload:
+          type: object
+          additionalProperties: true
   responses:
     BadRequest:
       description: Некорректный запрос

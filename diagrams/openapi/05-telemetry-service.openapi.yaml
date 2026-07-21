@@ -1,8 +1,8 @@
 openapi: 3.1.1
 info:
   title: Telemetry Service API
-  version: 1.0.0
-  description: Чтение текущего состояния устройств и истории телеметрических показаний.
+  version: 1.1.0
+  description: Предоставление текущего состояния и истории телеметрии; приём показаний выполняется асинхронно по Kafka.
 servers:
 - url: https://api.smart-home.example.com/telemetry/v1
   description: Доступ через API Gateway
@@ -20,7 +20,7 @@ paths:
     - name: deviceId
       in: path
       required: true
-      schema: &id001
+      schema:
         type: string
         format: uuid
     get:
@@ -41,7 +41,9 @@ paths:
     - name: deviceId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     get:
       tags:
       - State
@@ -60,7 +62,9 @@ paths:
     - name: deviceId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     get:
       tags:
       - Telemetry
@@ -72,13 +76,31 @@ paths:
           type: string
       - name: from
         in: query
-        schema: &id002
+        schema:
           type: string
           format: date-time
       - name: to
         in: query
-        schema: *id002
+        schema:
+          type: string
+          format: date-time
       - $ref: '#/components/parameters/Limit'
+      - name: aggregation
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - RAW
+          - MIN
+          - MAX
+          - AVG
+      - name: interval
+        in: query
+        required: false
+        description: Интервал агрегации, например 5m или 1h
+        schema:
+          type: string
       responses:
         '200':
           description: История телеметрии
@@ -138,8 +160,12 @@ components:
       - code
       - valueType
       properties:
-        id: *id001
-        deviceId: *id001
+        id:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
         code:
           type: string
           example: temperature
@@ -150,6 +176,9 @@ components:
           - string
           - 'null'
           example: celsius
+        configuration:
+          type: object
+          additionalProperties: true
     TelemetryReading:
       type: object
       required:
@@ -159,9 +188,13 @@ components:
       - measuredAt
       - receivedAt
       properties:
-        id: *id001
-        metricId: *id001
-        value: &id003
+        id:
+          type: string
+          format: uuid
+        metricId:
+          type: string
+          format: uuid
+        value:
           description: Произвольное JSON-значение
           oneOf:
           - type: string
@@ -173,15 +206,21 @@ components:
           - type: array
             items: {}
           - type: 'null'
-        measuredAt: *id002
-        receivedAt: *id002
+        measuredAt:
+          type: string
+          format: date-time
+        receivedAt:
+          type: string
+          format: date-time
     CurrentState:
       type: object
       required:
       - deviceId
       - metrics
       properties:
-        deviceId: *id001
+        deviceId:
+          type: string
+          format: uuid
         metrics:
           type: array
           items:
@@ -193,12 +232,25 @@ components:
             properties:
               code:
                 type: string
-              value: *id003
+              value:
+                description: Произвольное JSON-значение
+                oneOf:
+                - type: string
+                - type: number
+                - type: integer
+                - type: boolean
+                - type: object
+                  additionalProperties: true
+                - type: array
+                  items: {}
+                - type: 'null'
               unit:
                 type:
                 - string
                 - 'null'
-              measuredAt: *id002
+              measuredAt:
+                type: string
+                format: date-time
   responses:
     BadRequest:
       description: Некорректный запрос

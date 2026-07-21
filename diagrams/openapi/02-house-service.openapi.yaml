@@ -1,8 +1,8 @@
 openapi: 3.1.1
 info:
   title: House Service API
-  version: 1.0.0
-  description: Управление домами, помещениями, зонами и доступом пользователей к дому.
+  version: 1.1.0
+  description: Управление структурой дома — домами, комнатами и зонами — и доступом участников.
 servers:
 - url: https://api.smart-home.example.com/houses/v1
   description: Доступ через API Gateway
@@ -14,6 +14,7 @@ tags:
 - name: Houses
 - name: Rooms
 - name: Zones
+- name: Members
 paths:
   /houses:
     get:
@@ -54,7 +55,7 @@ paths:
     - name: houseId
       in: path
       required: true
-      schema: &id001
+      schema:
         type: string
         format: uuid
     get:
@@ -101,7 +102,9 @@ paths:
     - name: houseId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     get:
       tags:
       - Rooms
@@ -137,7 +140,9 @@ paths:
     - name: roomId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     post:
       tags:
       - Zones
@@ -155,6 +160,201 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Zone'
+    get:
+      tags:
+      - Zones
+      summary: Получить зоны помещения
+      responses:
+        '200':
+          description: Список зон
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Zone'
+  /rooms/{roomId}:
+    parameters:
+    - name: roomId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Rooms
+      summary: Получить помещение
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Room'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Rooms
+      summary: Изменить помещение
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRoomRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Room'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Rooms
+      summary: Удалить помещение
+      responses:
+        '204':
+          description: Помещение удалено
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /zones/{zoneId}:
+    parameters:
+    - name: zoneId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Zones
+      summary: Получить зону
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Zone'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Zones
+      summary: Изменить зону
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateZoneRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Zone'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Zones
+      summary: Удалить зону
+      responses:
+        '204':
+          description: Зона удалена
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /houses/{houseId}/members:
+    parameters:
+    - name: houseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Members
+      summary: Получить участников дома
+      responses:
+        '200':
+          description: Участники дома
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HouseMember'
+    post:
+      tags:
+      - Members
+      summary: Добавить участника дома
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddHouseMemberRequest'
+      responses:
+        '201':
+          description: Участник добавлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseMember'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /houses/{houseId}/members/{userId}:
+    parameters:
+    - name: houseId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    patch:
+      tags:
+      - Members
+      summary: Изменить роль участника дома
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateHouseMemberRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseMember'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Members
+      summary: Удалить участника из дома
+      responses:
+        '204':
+          description: Участник удалён
+        '404':
+          $ref: '#/components/responses/NotFound'
 components:
   securitySchemes:
     bearerAuth:
@@ -205,7 +405,9 @@ components:
       - timezone
       - createdAt
       properties:
-        id: *id001
+        id:
+          type: string
+          format: uuid
         name:
           type: string
           maxLength: 255
@@ -216,12 +418,13 @@ components:
         timezone:
           type: string
           example: Europe/Vienna
-        createdAt: &id002
+        createdAt:
           type: string
           format: date-time
         updatedAt:
           oneOf:
-          - *id002
+          - type: string
+            format: date-time
           - type: 'null'
     CreateHouseRequest:
       type: object
@@ -255,8 +458,12 @@ components:
       - houseId
       - name
       properties:
-        id: *id001
-        houseId: *id001
+        id:
+          type: string
+          format: uuid
+        houseId:
+          type: string
+          format: uuid
         name:
           type: string
         floor:
@@ -279,8 +486,12 @@ components:
       - roomId
       - name
       properties:
-        id: *id001
-        roomId: *id001
+        id:
+          type: string
+          format: uuid
+        roomId:
+          type: string
+          format: uuid
         name:
           type: string
         description:
@@ -308,6 +519,74 @@ components:
             $ref: '#/components/schemas/House'
         page:
           $ref: '#/components/schemas/PageInfo'
+    UpdateRoomRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        floor:
+          type:
+          - integer
+          - 'null'
+    UpdateZoneRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+    HouseMember:
+      type: object
+      required:
+      - houseId
+      - userId
+      - membershipRole
+      - joinedAt
+      properties:
+        houseId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        membershipRole:
+          type: string
+          enum:
+          - OWNER
+          - ADMIN
+          - MEMBER
+          - GUEST
+        joinedAt:
+          type: string
+          format: date-time
+    AddHouseMemberRequest:
+      type: object
+      required:
+      - userId
+      - membershipRole
+      properties:
+        userId:
+          type: string
+          format: uuid
+        membershipRole:
+          type: string
+          enum:
+          - ADMIN
+          - MEMBER
+          - GUEST
+    UpdateHouseMemberRequest:
+      type: object
+      required:
+      - membershipRole
+      properties:
+        membershipRole:
+          type: string
+          enum:
+          - ADMIN
+          - MEMBER
+          - GUEST
   responses:
     BadRequest:
       description: Некорректный запрос

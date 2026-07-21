@@ -1,8 +1,8 @@
 openapi: 3.1.1
 info:
   title: Partner Integration Service API
-  version: 1.0.0
-  description: Управление партнёрами, адаптерами внешних протоколов и привязками внешних устройств.
+  version: 1.1.0
+  description: Управление партнёрами, протокольными адаптерами и внешними подключениями устройств.
 servers:
 - url: https://api.smart-home.example.com/integrations/v1
   description: Доступ через API Gateway
@@ -51,7 +51,7 @@ paths:
     - name: partnerId
       in: path
       required: true
-      schema: &id001
+      schema:
         type: string
         format: uuid
     get:
@@ -102,12 +102,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DeviceIntegration'
+    get:
+      tags:
+      - Integrations
+      summary: Получить интеграции устройств
+      parameters:
+      - name: deviceId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: adapterId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: connectionStatus
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Интеграции устройств
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeviceIntegration'
   /integrations/{integrationId}:
     parameters:
     - name: integrationId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     get:
       tags:
       - Integrations
@@ -119,12 +152,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DeviceIntegration'
+    patch:
+      tags:
+      - Integrations
+      summary: Изменить интеграцию
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateIntegrationRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceIntegration'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Integrations
+      summary: Удалить интеграцию
+      responses:
+        '204':
+          description: Интеграция удалена
+        '404':
+          $ref: '#/components/responses/NotFound'
   /integrations/{integrationId}/sync:
     parameters:
     - name: integrationId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     post:
       tags:
       - Integrations
@@ -134,6 +197,114 @@ paths:
           description: Синхронизация запущена
         '404':
           $ref: '#/components/responses/NotFound'
+  /partners/{partnerId}:
+    parameters:
+    - name: partnerId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Partners
+      summary: Получить партнёра
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Partner'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Partners
+      summary: Изменить партнёра
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePartnerRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Partner'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Partners
+      summary: Удалить партнёра
+      responses:
+        '204':
+          description: Партнёр удалён
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /partners/{partnerId}/adapters/{adapterId}:
+    parameters:
+    - name: partnerId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: adapterId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Adapters
+      summary: Получить адаптер
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Adapter'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Adapters
+      summary: Изменить адаптер
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAdapterRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Adapter'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+      - Adapters
+      summary: Удалить адаптер
+      responses:
+        '204':
+          description: Адаптер удалён
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
 components:
   securitySchemes:
     bearerAuth:
@@ -183,7 +354,9 @@ components:
       - name
       - status
       properties:
-        id: *id001
+        id:
+          type: string
+          format: uuid
         name:
           type: string
         status:
@@ -208,8 +381,12 @@ components:
       - protocol
       - enabled
       properties:
-        id: *id001
-        partnerId: *id001
+        id:
+          type: string
+          format: uuid
+        partnerId:
+          type: string
+          format: uuid
         name:
           type: string
         protocol:
@@ -253,9 +430,15 @@ components:
       - externalDeviceId
       - connectionStatus
       properties:
-        id: *id001
-        deviceId: *id001
-        adapterId: *id001
+        id:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
+        adapterId:
+          type: string
+          format: uuid
         externalDeviceId:
           type: string
         connectionStatus:
@@ -277,8 +460,42 @@ components:
       - adapterId
       - externalDeviceId
       properties:
-        deviceId: *id001
-        adapterId: *id001
+        deviceId:
+          type: string
+          format: uuid
+        adapterId:
+          type: string
+          format: uuid
+        externalDeviceId:
+          type: string
+        credentials:
+          type: object
+          additionalProperties: true
+          writeOnly: true
+    UpdatePartnerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - DISABLED
+          - TESTING
+    UpdateAdapterRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        configuration:
+          type: object
+          additionalProperties: true
+        enabled:
+          type: boolean
+    UpdateIntegrationRequest:
+      type: object
+      properties:
         externalDeviceId:
           type: string
         credentials:

@@ -1,8 +1,8 @@
 openapi: 3.1.1
 info:
   title: Device Command Service API
-  version: 1.0.0
-  description: Приём команд, валидация capabilities, хранение статусов и асинхронная отправка устройствам.
+  version: 1.1.0
+  description: Приём и проверка команд, асинхронная публикация в Kafka, хранение текущих статусов и истории изменений.
 servers:
 - url: https://api.smart-home.example.com/commands/v1
   description: Доступ через API Gateway
@@ -18,7 +18,7 @@ paths:
       tags:
       - Commands
       summary: Создать команду устройству
-      description: Возвращает команду со статусом PENDING. Фактическая доставка выполняется асинхронно через Kafka.
+      description: Команда проверяется, сохраняется со статусом PENDING и публикуется в Kafka. Возвращается HTTP 202.
       requestBody:
         required: true
         content:
@@ -36,12 +36,20 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        description: Ключ защиты от повторного создания одной команды. Если передан, имеет приоритет над полем тела.
+        schema:
+          type: string
+          maxLength: 128
   /commands/{commandId}:
     parameters:
     - name: commandId
       in: path
       required: true
-      schema: &id001
+      schema:
         type: string
         format: uuid
     get:
@@ -62,7 +70,9 @@ paths:
     - name: commandId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     get:
       tags:
       - Commands
@@ -81,7 +91,9 @@ paths:
     - name: deviceId
       in: path
       required: true
-      schema: *id001
+      schema:
+        type: string
+        format: uuid
     get:
       tags:
       - Commands
@@ -89,6 +101,28 @@ paths:
       parameters:
       - $ref: '#/components/parameters/Limit'
       - $ref: '#/components/parameters/Offset'
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - PENDING
+          - SENT
+          - COMPLETED
+          - FAILED
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date-time
       responses:
         '200':
           description: Команды устройства
@@ -147,7 +181,9 @@ components:
       - commandType
       - parameters
       properties:
-        deviceId: *id001
+        deviceId:
+          type: string
+          format: uuid
         commandType:
           type: string
           example: heating.set
@@ -159,7 +195,8 @@ components:
             targetTemperature: 23
         scenarioId:
           oneOf:
-          - *id001
+          - type: string
+            format: uuid
           - type: 'null'
         idempotencyKey:
           type: string
@@ -174,15 +211,21 @@ components:
       - status
       - createdAt
       properties:
-        id: *id001
-        deviceId: *id001
+        id:
+          type: string
+          format: uuid
+        deviceId:
+          type: string
+          format: uuid
         requestedByUserId:
           oneOf:
-          - *id001
+          - type: string
+            format: uuid
           - type: 'null'
         scenarioId:
           oneOf:
-          - *id001
+          - type: string
+            format: uuid
           - type: 'null'
         commandType:
           type: string
@@ -196,13 +239,18 @@ components:
           - SENT
           - COMPLETED
           - FAILED
-        createdAt: &id002
+        createdAt:
           type: string
           format: date-time
         completedAt:
           oneOf:
-          - *id002
+          - type: string
+            format: date-time
           - type: 'null'
+        idempotencyKey:
+          type:
+          - string
+          - 'null'
     CommandStatusRecord:
       type: object
       required:
@@ -219,7 +267,9 @@ components:
         details:
           type: object
           additionalProperties: true
-        occurredAt: *id002
+        occurredAt:
+          type: string
+          format: date-time
   responses:
     BadRequest:
       description: Некорректный запрос
