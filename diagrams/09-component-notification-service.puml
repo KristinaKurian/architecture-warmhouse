@@ -1,0 +1,32 @@
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — Notification Service
+
+Container_Boundary(notificationService, "Notification Service") {
+    Component(notificationApi, "Notification API", "REST Controller", "Настройки уведомлений и просмотр истории")
+    Component(preferenceComponent, "Notification Preference Component", "Application Service", "Настройки каналов и правил уведомлений")
+    Component(eventConsumer, "Notification Event Consumer", "Messaging Consumer", "Слушает события системы")
+    Component(templateComponent, "Template Component", "Application Service", "Подготовка текста уведомления")
+    Component(deliveryComponent, "Delivery Component", "Application Service", "Отправка в email / SMS / push")
+    Component(notificationRepository, "Notification Repository", "Repository", "История уведомлений и настройки")
+}
+
+Container(apiGateway, "API Gateway / BFF", "Go / Node.js", "Единая точка входа")
+ContainerQueue(messageBroker, "Message Broker", "Kafka / RabbitMQ / MQTT", "Команды и события")
+System_Ext(notificationProvider, "Провайдер уведомлений", "Email, SMS, Push")
+ContainerDb(notificationDb, "Notification DB", "PostgreSQL", "История уведомлений и статусы отправки")
+
+Rel(apiGateway, notificationApi, "REST")
+Rel(notificationApi, preferenceComponent, "")
+Rel(preferenceComponent, notificationRepository, "Читает / пишет")
+
+Rel(messageBroker, eventConsumer, "Передаёт события")
+Rel(eventConsumer, templateComponent, "Передаёт событие")
+Rel(templateComponent, deliveryComponent, "Формирует сообщение")
+Rel(deliveryComponent, notificationProvider, "Отправляет")
+
+Rel(deliveryComponent, notificationRepository, "Сохраняет статус")
+Rel(notificationRepository, notificationDb, "Read / Write")
+
+@enduml

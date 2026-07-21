@@ -1,0 +1,274 @@
+openapi: 3.1.1
+info:
+  title: Notification Service API
+  version: 1.0.0
+  description: Настройки каналов доставки и чтение истории уведомлений.
+servers:
+- url: https://api.smart-home.example.com/notifications/v1
+  description: Доступ через API Gateway
+- url: http://notifications:8080/v1
+  description: Внутренний адрес сервиса
+security:
+- bearerAuth: []
+tags:
+- name: Preferences
+- name: Notifications
+paths:
+  /notification-preferences:
+    get:
+      tags:
+      - Preferences
+      summary: Получить настройки уведомлений
+      responses:
+        '200':
+          description: Настройки
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationPreference'
+    put:
+      tags:
+      - Preferences
+      summary: Обновить настройки уведомлений
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePreferencesRequest'
+      responses:
+        '200':
+          description: Настройки обновлены
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationPreference'
+  /notifications:
+    get:
+      tags:
+      - Notifications
+      summary: История уведомлений пользователя
+      parameters:
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Уведомления
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+  /notifications/{notificationId}:
+    parameters:
+    - name: notificationId
+      in: path
+      required: true
+      schema: &id001
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Notifications
+      summary: Получить уведомление
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /notifications/{notificationId}/retry:
+    parameters:
+    - name: notificationId
+      in: path
+      required: true
+      schema: *id001
+    post:
+      tags:
+      - Notifications
+      summary: Повторить неуспешную доставку
+      responses:
+        '202':
+          description: Повторная доставка запущена
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Некорректные параметры запроса
+        details:
+          type: object
+          additionalProperties: true
+        traceId:
+          type: string
+          example: 01J0TRACEIDEXAMPLE
+    PageInfo:
+      type: object
+      required:
+      - limit
+      - offset
+      - total
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        offset:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+    NotificationPreference:
+      type: object
+      required:
+      - id
+      - eventType
+      - channel
+      - enabled
+      properties:
+        id: *id001
+        eventType:
+          type: string
+        channel:
+          type: string
+          enum:
+          - PUSH
+          - EMAIL
+          - SMS
+        enabled:
+          type: boolean
+    UpdatePreferencesRequest:
+      type: object
+      required:
+      - preferences
+      properties:
+        preferences:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationPreference'
+    NotificationDelivery:
+      type: object
+      required:
+      - id
+      - channel
+      - status
+      properties:
+        id: *id001
+        channel:
+          type: string
+          enum:
+          - PUSH
+          - EMAIL
+          - SMS
+        status:
+          type: string
+          enum:
+          - PENDING
+          - SENT
+          - FAILED
+        sentAt:
+          oneOf:
+          - &id002
+            type: string
+            format: date-time
+          - type: 'null'
+        errorMessage:
+          type:
+          - string
+          - 'null'
+    Notification:
+      type: object
+      required:
+      - id
+      - eventType
+      - status
+      - createdAt
+      - deliveries
+      properties:
+        id: *id001
+        eventType:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        status:
+          type: string
+          enum:
+          - CREATED
+          - PROCESSING
+          - DELIVERED
+          - FAILED
+        createdAt: *id002
+        deliveries:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationDelivery'
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Требуется аутентификация
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Недостаточно прав
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Конфликт состояния ресурса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0

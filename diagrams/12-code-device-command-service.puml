@@ -1,0 +1,98 @@
+@startuml
+title Code Diagram — Device Command Service
+
+interface CommandRepository {
+  +Save(command: DeviceCommand)
+  +UpdateStatus(commandId: UUID, status: CommandStatus)
+  +FindById(commandId: UUID): DeviceCommand
+  +FindHistory(deviceId: UUID): List<DeviceCommand>
+}
+
+interface DeviceClient {
+  +Send(command: OutgoingDeviceCommand): DeliveryResult
+}
+
+interface EventPublisher {
+  +PublishCommand(command: OutgoingDeviceCommand)
+  +PublishStatusChanged(event: CommandStatusChangedEvent)
+}
+
+class CommandController {
+  +CreateCommand(request: CreateCommandRequest): CommandResponse
+  +GetCommand(commandId: UUID): CommandResponse
+  +GetDeviceHistory(deviceId: UUID): List<CommandResponse>
+}
+
+class CommandApplicationService {
+  +CreateCommand(request: CreateCommandRequest): DeviceCommand
+  +MarkAsSent(commandId: UUID)
+  +MarkAsFailed(commandId: UUID, reason: string)
+  +GetHistory(deviceId: UUID): List<DeviceCommand>
+}
+
+class CommandValidator {
+  +Validate(request: CreateCommandRequest)
+  +ValidateCapability(device: DeviceInfo, capability: string)
+  +ValidateParameters(commandType: string, parameters: Map)
+}
+
+class CommandDispatcher {
+  +Dispatch(command: DeviceCommand)
+}
+
+class DeviceCapabilityService {
+  +GetDevice(deviceId: UUID): DeviceInfo
+  +Supports(deviceId: UUID, capability: string): bool
+}
+
+class CommandStatusTracker {
+  +SetPending(commandId: UUID)
+  +SetSent(commandId: UUID)
+  +SetFailed(commandId: UUID, reason: string)
+  +SetCompleted(commandId: UUID)
+}
+
+class DeviceCommand {
+  +id: UUID
+  +deviceId: UUID
+  +commandType: string
+  +parameters: Map
+  +status: CommandStatus
+  +createdAt: DateTime
+}
+
+enum CommandStatus {
+  PENDING
+  SENT
+  FAILED
+  COMPLETED
+}
+
+class CreateCommandRequest {
+  +deviceId: UUID
+  +commandType: string
+  +parameters: Map
+}
+
+class CommandStatusChangedEvent {
+  +commandId: UUID
+  +status: CommandStatus
+  +timestamp: DateTime
+}
+
+CommandController --> CommandApplicationService
+CommandApplicationService --> CommandValidator
+CommandApplicationService --> DeviceCapabilityService
+CommandApplicationService --> CommandRepository
+CommandApplicationService --> CommandDispatcher
+CommandDispatcher --> EventPublisher
+CommandStatusTracker --> CommandRepository
+CommandStatusTracker --> EventPublisher
+CommandApplicationService --> CommandStatusTracker
+
+CommandApplicationService --> DeviceCommand
+CommandApplicationService --> CreateCommandRequest
+CommandStatusTracker --> CommandStatusChangedEvent
+DeviceCommand --> CommandStatus
+
+@enduml

@@ -1,0 +1,30 @@
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — House Service
+
+Container_Boundary(houseService, "House Service") {
+    Component(houseApi, "House API", "REST Controller", "Работа с домами, помещениями и зонами")
+    Component(houseComponent, "House Management Component", "Application Service", "Управление домами пользователя")
+    Component(roomComponent, "Room Management Component", "Application Service", "Управление комнатами")
+    Component(zoneComponent, "Zone Management Component", "Application Service", "Управление зонами")
+    Component(houseRepository, "House Repository", "Repository", "Доступ к домам, комнатам и зонам")
+}
+
+Container(apiGateway, "API Gateway / BFF", "Go / Node.js", "Единая точка входа")
+ContainerDb(houseDb, "House DB", "PostgreSQL", "Дома, комнаты и зоны")
+Container(userService, "User Service", "Go", "Пользователи, роли и права доступа")
+
+Rel(apiGateway, houseApi, "REST")
+Rel(houseApi, houseComponent, "")
+Rel(houseApi, roomComponent, "")
+Rel(houseApi, zoneComponent, "")
+
+Rel(houseComponent, houseRepository, "Читает / пишет")
+Rel(roomComponent, houseRepository, "Читает / пишет")
+Rel(zoneComponent, houseRepository, "Читает / пишет")
+
+Rel(houseRepository, houseDb, "Read / Write")
+Rel(houseApi, userService, "Проверяет доступ", "REST")
+
+@enduml

@@ -1,0 +1,288 @@
+openapi: 3.1.1
+info:
+  title: Catalog Service API
+  version: 1.0.0
+  description: Каталог устройств, модулей, комплектов и правил совместимости.
+servers:
+- url: https://api.smart-home.example.com/catalog/v1
+  description: Доступ через API Gateway
+- url: http://catalog:8080/v1
+  description: Внутренний адрес сервиса
+security:
+- bearerAuth: []
+tags:
+- name: Catalog
+- name: Bundles
+- name: Compatibility
+paths:
+  /catalog/items:
+    get:
+      tags:
+      - Catalog
+      summary: Поиск устройств и модулей
+      parameters:
+      - name: query
+        in: query
+        schema:
+          type: string
+      - name: itemType
+        in: query
+        schema:
+          type: string
+      - name: active
+        in: query
+        schema:
+          type: boolean
+          default: true
+      responses:
+        '200':
+          description: Элементы каталога
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CatalogItem'
+  /catalog/items/{itemId}:
+    parameters:
+    - name: itemId
+      in: path
+      required: true
+      schema: &id001
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Catalog
+      summary: Получить элемент каталога
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /catalog/items/{itemId}/compatibility:
+    parameters:
+    - name: itemId
+      in: path
+      required: true
+      schema: *id001
+    get:
+      tags:
+      - Compatibility
+      summary: Получить совместимые и несовместимые элементы
+      responses:
+        '200':
+          description: Совместимость
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Compatibility'
+  /catalog/bundles:
+    get:
+      tags:
+      - Bundles
+      summary: Список комплектов
+      responses:
+        '200':
+          description: Комплекты
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Bundle'
+  /catalog/bundles/{bundleId}:
+    parameters:
+    - name: bundleId
+      in: path
+      required: true
+      schema: *id001
+    get:
+      tags:
+      - Bundles
+      summary: Получить комплект
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bundle'
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Некорректные параметры запроса
+        details:
+          type: object
+          additionalProperties: true
+        traceId:
+          type: string
+          example: 01J0TRACEIDEXAMPLE
+    PageInfo:
+      type: object
+      required:
+      - limit
+      - offset
+      - total
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        offset:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+    CatalogItem:
+      type: object
+      required:
+      - id
+      - sku
+      - name
+      - itemType
+      - active
+      properties:
+        id: *id001
+        deviceModelId:
+          oneOf:
+          - *id001
+          - type: 'null'
+        sku:
+          type: string
+        name:
+          type: string
+        itemType:
+          type: string
+          enum:
+          - DEVICE
+          - MODULE
+          - ACCESSORY
+        description:
+          type:
+          - string
+          - 'null'
+        active:
+          type: boolean
+    BundleItem:
+      type: object
+      required:
+      - item
+      - quantity
+      properties:
+        item:
+          $ref: '#/components/schemas/CatalogItem'
+        quantity:
+          type: integer
+          minimum: 1
+    Bundle:
+      type: object
+      required:
+      - id
+      - name
+      - active
+      - items
+      properties:
+        id: *id001
+        name:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+        active:
+          type: boolean
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BundleItem'
+    Compatibility:
+      type: object
+      required:
+      - sourceItemId
+      - targetItemId
+      - relationType
+      properties:
+        sourceItemId: *id001
+        targetItemId: *id001
+        relationType:
+          type: string
+          enum:
+          - COMPATIBLE
+          - REQUIRES
+          - INCOMPATIBLE
+        notes:
+          type:
+          - string
+          - 'null'
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Требуется аутентификация
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Недостаточно прав
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Конфликт состояния ресурса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0

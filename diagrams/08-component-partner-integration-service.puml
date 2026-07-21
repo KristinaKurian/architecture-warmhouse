@@ -1,0 +1,33 @@
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — Partner Integration Service
+
+Container_Boundary(partnerService, "Partner Integration Service") {
+    Component(partnerApi, "Partner API", "REST Controller", "Управление партнёрами и интеграциями")
+    Component(adapterRegistry, "Adapter Registry", "Application Service", "Хранит список адаптеров и протоколов")
+    Component(protocolTranslator, "Protocol Translator", "Integration Component", "Преобразует внешние команды и телеметрию")
+    Component(deviceConnector, "Device Connector", "Integration Component", "Подключение к внешним устройствам и платформам")
+    Component(eventBridge, "Event Bridge", "Messaging Adapter", "Получает и публикует события в брокер")
+    Component(partnerRepository, "Partner Repository", "Repository", "Хранение конфигурации партнёров")
+}
+
+ContainerQueue(messageBroker, "Message Broker", "Kafka / RabbitMQ / MQTT", "Команды и события")
+Container_Ext(partnerDevices, "Партнёрские устройства", "Сторонние производители и платформы")
+ContainerDb(partnerDb, "Partner Config DB", "PostgreSQL", "Конфигурации адаптеров и партнёров")
+
+Rel(partnerApi, adapterRegistry, "")
+Rel(adapterRegistry, partnerRepository, "Читает / пишет")
+
+Rel(messageBroker, eventBridge, "Получает команды / события")
+Rel(eventBridge, protocolTranslator, "Передаёт сообщения")
+Rel(protocolTranslator, deviceConnector, "Преобразует и отправляет")
+Rel(deviceConnector, partnerDevices, "Интеграция через внешние протоколы")
+
+Rel(deviceConnector, protocolTranslator, "Получает ответы и телеметрию")
+Rel(protocolTranslator, eventBridge, "Формирует внутренние события")
+Rel(eventBridge, messageBroker, "Публикует события и телеметрию")
+
+Rel(partnerRepository, partnerDb, "Read / Write")
+
+@enduml

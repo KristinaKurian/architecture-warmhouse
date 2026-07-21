@@ -1,0 +1,35 @@
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — Device Command Service
+
+Container_Boundary(commandService, "Device Command Service") {
+    Component(commandApi, "Command API", "REST Controller", "Принимает команды от UI и других сервисов")
+    Component(commandValidation, "Command Validation Component", "Application Service", "Проверяет допустимость команды и её параметры")
+    Component(commandExecution, "Command Execution Component", "Application Service", "Готовит и отправляет команду устройству")
+    Component(commandStatus, "Command Status Component", "Application Service", "Обновляет статус выполнения команды")
+    Component(commandHistory, "Command History Component", "Application Service", "История команд")
+    Component(commandPublisher, "Command Publisher", "Messaging Adapter", "Публикация команды в брокер")
+    Component(commandRepository, "Command Repository", "Repository", "Хранение команд и статусов")
+}
+
+Container(apiGateway, "API Gateway / BFF", "Go / Node.js", "Единая точка входа")
+Container(deviceService, "Device Management Service", "Go", "Устройства и capabilities")
+ContainerQueue(messageBroker, "Message Broker", "Kafka", "Команды и события")
+ContainerDb(commandDb, "Command DB", "PostgreSQL", "История команд и статусы выполнения")
+
+Rel(apiGateway, commandApi, "REST")
+Rel(commandApi, commandValidation, "")
+Rel(commandApi, commandExecution, "")
+Rel(commandApi, commandHistory, "")
+
+Rel(commandValidation, deviceService, "Проверяет устройство и capability", "REST")
+Rel(commandExecution, commandPublisher, "Передаёт команду")
+Rel(commandExecution, commandRepository, "Создаёт запись команды")
+Rel(commandStatus, commandRepository, "Обновляет статус")
+Rel(commandHistory, commandRepository, "Читает историю")
+
+Rel(commandPublisher, messageBroker, "Публикует команду")
+Rel(commandRepository, commandDb, "Read / Write")
+
+@enduml

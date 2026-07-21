@@ -53,7 +53,7 @@ func (h *SensorHandler) GetSensors(c *gin.Context) {
 	// Update temperature sensors with real-time data from the external API
 	for i, sensor := range sensors {
 		if sensor.Type == models.Temperature {
-			tempData, err := h.TemperatureService.GetTemperatureByID(fmt.Sprintf("%d", sensor.ID))
+			tempData, err := h.TemperatureService.GetTemperatureForSensor(sensor.Location, fmt.Sprintf("%d", sensor.ID))
 			if err == nil {
 				// Update sensor with real-time data
 				sensors[i].Value = tempData.Value
@@ -85,7 +85,7 @@ func (h *SensorHandler) GetSensorByID(c *gin.Context) {
 
 	// If this is a temperature sensor, fetch real-time data from the temperature API
 	if sensor.Type == models.Temperature {
-		tempData, err := h.TemperatureService.GetTemperatureByID(fmt.Sprintf("%d", sensor.ID))
+		tempData, err := h.TemperatureService.GetTemperatureForSensor(sensor.Location, fmt.Sprintf("%d", sensor.ID))
 		if err == nil {
 			// Update sensor with real-time data
 			sensor.Value = tempData.Value

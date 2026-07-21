@@ -1,0 +1,35 @@
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — Telemetry Service
+
+Container_Boundary(telemetryService, "Telemetry Service") {
+    Component(telemetryApi, "Telemetry API", "REST Controller", "Предоставляет текущую и историческую телеметрию")
+    Component(telemetryIngestion, "Telemetry Ingestion Component", "Messaging Consumer", "Получает телеметрию из брокера")
+    Component(currentStateComponent, "Current State Component", "Application Service", "Поддерживает текущее состояние устройств")
+    Component(historyComponent, "Telemetry History Component", "Application Service", "Хранит исторические показания")
+    Component(telemetryEventPublisher, "Telemetry Event Publisher", "Messaging Adapter", "Публикует события изменения состояния")
+    Component(telemetryRepository, "Telemetry Repository", "Repository", "Доступ к телеметрии и состояниям")
+}
+
+Container(apiGateway, "API Gateway / BFF", "Go / Node.js", "Единая точка входа")
+ContainerQueue(messageBroker, "Message Broker", "Kafka", "Команды и события")
+ContainerDb(telemetryDb, "Telemetry DB", "PostgreSQL", "Текущая и историческая телеметрия")
+
+Rel(apiGateway, telemetryApi, "REST")
+Rel(telemetryApi, currentStateComponent, "")
+Rel(telemetryApi, historyComponent, "")
+
+Rel(messageBroker, telemetryIngestion, "Передаёт телеметрию")
+Rel(telemetryIngestion, currentStateComponent, "Обновляет состояние")
+Rel(telemetryIngestion, historyComponent, "Сохраняет показания")
+
+Rel(currentStateComponent, telemetryRepository, "Читает / пишет")
+Rel(historyComponent, telemetryRepository, "Читает / пишет")
+
+Rel(currentStateComponent, telemetryEventPublisher, "Публикует событие изменения")
+Rel(telemetryEventPublisher, messageBroker, "Публикует события")
+
+Rel(telemetryRepository, telemetryDb, "Read / Write")
+
+@enduml

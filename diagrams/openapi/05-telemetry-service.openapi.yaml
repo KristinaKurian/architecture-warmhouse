@@ -1,0 +1,248 @@
+openapi: 3.1.1
+info:
+  title: Telemetry Service API
+  version: 1.0.0
+  description: Чтение текущего состояния устройств и истории телеметрических показаний.
+servers:
+- url: https://api.smart-home.example.com/telemetry/v1
+  description: Доступ через API Gateway
+- url: http://telemetry:8080/v1
+  description: Внутренний адрес сервиса
+security:
+- bearerAuth: []
+tags:
+- name: Metrics
+- name: State
+- name: Telemetry
+paths:
+  /devices/{deviceId}/metrics:
+    parameters:
+    - name: deviceId
+      in: path
+      required: true
+      schema: &id001
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Metrics
+      summary: Получить список метрик устройства
+      responses:
+        '200':
+          description: Метрики
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Metric'
+  /devices/{deviceId}/state:
+    parameters:
+    - name: deviceId
+      in: path
+      required: true
+      schema: *id001
+    get:
+      tags:
+      - State
+      summary: Получить текущее состояние устройства
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentState'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /devices/{deviceId}/telemetry:
+    parameters:
+    - name: deviceId
+      in: path
+      required: true
+      schema: *id001
+    get:
+      tags:
+      - Telemetry
+      summary: Получить историю телеметрии
+      parameters:
+      - name: metricCode
+        in: query
+        schema:
+          type: string
+      - name: from
+        in: query
+        schema: &id002
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        schema: *id002
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: История телеметрии
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TelemetryReading'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Некорректные параметры запроса
+        details:
+          type: object
+          additionalProperties: true
+        traceId:
+          type: string
+          example: 01J0TRACEIDEXAMPLE
+    PageInfo:
+      type: object
+      required:
+      - limit
+      - offset
+      - total
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        offset:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+    Metric:
+      type: object
+      required:
+      - id
+      - deviceId
+      - code
+      - valueType
+      properties:
+        id: *id001
+        deviceId: *id001
+        code:
+          type: string
+          example: temperature
+        valueType:
+          type: string
+        unit:
+          type:
+          - string
+          - 'null'
+          example: celsius
+    TelemetryReading:
+      type: object
+      required:
+      - id
+      - metricId
+      - value
+      - measuredAt
+      - receivedAt
+      properties:
+        id: *id001
+        metricId: *id001
+        value: &id003
+          description: Произвольное JSON-значение
+          oneOf:
+          - type: string
+          - type: number
+          - type: integer
+          - type: boolean
+          - type: object
+            additionalProperties: true
+          - type: array
+            items: {}
+          - type: 'null'
+        measuredAt: *id002
+        receivedAt: *id002
+    CurrentState:
+      type: object
+      required:
+      - deviceId
+      - metrics
+      properties:
+        deviceId: *id001
+        metrics:
+          type: array
+          items:
+            type: object
+            required:
+            - code
+            - value
+            - measuredAt
+            properties:
+              code:
+                type: string
+              value: *id003
+              unit:
+                type:
+                - string
+                - 'null'
+              measuredAt: *id002
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Требуется аутентификация
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Недостаточно прав
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Конфликт состояния ресурса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0

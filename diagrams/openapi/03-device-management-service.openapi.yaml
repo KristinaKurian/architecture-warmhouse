@@ -1,0 +1,349 @@
+openapi: 3.1.1
+info:
+  title: Device Management Service API
+  version: 1.0.0
+  description: Регистрация, настройка, учёт и привязка устройств, а также предоставление capabilities.
+servers:
+- url: https://api.smart-home.example.com/devices/v1
+  description: Доступ через API Gateway
+- url: http://devices:8080/v1
+  description: Внутренний адрес сервиса
+security:
+- bearerAuth: []
+tags:
+- name: Devices
+- name: Bindings
+- name: Capabilities
+paths:
+  /devices:
+    get:
+      tags:
+      - Devices
+      summary: Список устройств пользователя
+      parameters:
+      - name: houseId
+        in: query
+        schema: &id001
+          type: string
+          format: uuid
+      - name: status
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Список устройств
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Device'
+    post:
+      tags:
+      - Devices
+      summary: Зарегистрировать устройство
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterDeviceRequest'
+      responses:
+        '201':
+          description: Устройство зарегистрировано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /devices/{deviceId}:
+    parameters:
+    - name: deviceId
+      in: path
+      required: true
+      schema: *id001
+    get:
+      tags:
+      - Devices
+      summary: Получить устройство
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Devices
+      summary: Изменить устройство
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDeviceRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+  /devices/{deviceId}/bindings:
+    parameters:
+    - name: deviceId
+      in: path
+      required: true
+      schema: *id001
+    post:
+      tags:
+      - Bindings
+      summary: Привязать устройство к дому или помещению
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BindDeviceRequest'
+      responses:
+        '201':
+          description: Привязка создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceBinding'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /devices/{deviceId}/capabilities:
+    parameters:
+    - name: deviceId
+      in: path
+      required: true
+      schema: *id001
+    get:
+      tags:
+      - Capabilities
+      summary: Получить возможности устройства
+      responses:
+        '200':
+          description: Capabilities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Capability'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Некорректные параметры запроса
+        details:
+          type: object
+          additionalProperties: true
+        traceId:
+          type: string
+          example: 01J0TRACEIDEXAMPLE
+    PageInfo:
+      type: object
+      required:
+      - limit
+      - offset
+      - total
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        offset:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+    Capability:
+      type: object
+      required:
+      - code
+      - name
+      - valueType
+      properties:
+        code:
+          type: string
+          example: temperature.set
+        name:
+          type: string
+        valueType:
+          type: string
+          enum:
+          - boolean
+          - integer
+          - decimal
+          - string
+          - object
+        unit:
+          type:
+          - string
+          - 'null'
+          example: celsius
+        configuration:
+          type: object
+          additionalProperties: true
+    Device:
+      type: object
+      required:
+      - id
+      - modelId
+      - serialNumber
+      - status
+      - registeredAt
+      properties:
+        id: *id001
+        modelId: *id001
+        serialNumber:
+          type: string
+        status:
+          type: string
+          enum:
+          - ONLINE
+          - OFFLINE
+          - UNAVAILABLE
+          - PAIRING
+        registeredAt: &id002
+          type: string
+          format: date-time
+        lastSeenAt:
+          oneOf:
+          - *id002
+          - type: 'null'
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/Capability'
+    RegisterDeviceRequest:
+      type: object
+      required:
+      - serialNumber
+      - modelId
+      - pairingToken
+      properties:
+        serialNumber:
+          type: string
+        modelId: *id001
+        pairingToken:
+          type: string
+    UpdateDeviceRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+        status:
+          type: string
+          enum:
+          - ONLINE
+          - OFFLINE
+          - UNAVAILABLE
+    BindDeviceRequest:
+      type: object
+      required:
+      - houseId
+      properties:
+        houseId: *id001
+        roomId:
+          oneOf:
+          - *id001
+          - type: 'null'
+        zoneId:
+          oneOf:
+          - *id001
+          - type: 'null'
+    DeviceBinding:
+      type: object
+      required:
+      - id
+      - deviceId
+      - houseId
+      - boundAt
+      properties:
+        id: *id001
+        deviceId: *id001
+        houseId: *id001
+        roomId:
+          oneOf:
+          - *id001
+          - type: 'null'
+        zoneId:
+          oneOf:
+          - *id001
+          - type: 'null'
+        boundAt: *id002
+        unboundAt:
+          oneOf:
+          - *id002
+          - type: 'null'
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Требуется аутентификация
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Недостаточно прав
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Конфликт состояния ресурса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0

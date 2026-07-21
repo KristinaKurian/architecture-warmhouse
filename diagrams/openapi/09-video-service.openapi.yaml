@@ -1,0 +1,307 @@
+openapi: 3.1.1
+info:
+  title: Video Service API
+  version: 1.0.0
+  description: Управление камерами, доступ к видеопотокам, снимкам и архиву.
+servers:
+- url: https://api.smart-home.example.com/video/v1
+  description: Доступ через API Gateway
+- url: http://video:8080/v1
+  description: Внутренний адрес сервиса
+security:
+- bearerAuth: []
+tags:
+- name: Cameras
+- name: Streams
+- name: Snapshots
+- name: Recordings
+paths:
+  /cameras:
+    get:
+      tags:
+      - Cameras
+      summary: Список камер
+      parameters:
+      - name: houseId
+        in: query
+        schema: &id001
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Камеры
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Camera'
+    post:
+      tags:
+      - Cameras
+      summary: Подключить камеру
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCameraRequest'
+      responses:
+        '201':
+          description: Камера подключена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Camera'
+  /cameras/{cameraId}:
+    parameters:
+    - name: cameraId
+      in: path
+      required: true
+      schema: *id001
+    get:
+      tags:
+      - Cameras
+      summary: Получить камеру
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Camera'
+  /cameras/{cameraId}/stream:
+    parameters:
+    - name: cameraId
+      in: path
+      required: true
+      schema: *id001
+    get:
+      tags:
+      - Streams
+      summary: Получить временную ссылку на видеопоток
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreamAccess'
+  /cameras/{cameraId}/snapshots:
+    parameters:
+    - name: cameraId
+      in: path
+      required: true
+      schema: *id001
+    post:
+      tags:
+      - Snapshots
+      summary: Создать снимок
+      responses:
+        '201':
+          description: Снимок создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Snapshot'
+  /cameras/{cameraId}/recordings:
+    parameters:
+    - name: cameraId
+      in: path
+      required: true
+      schema: *id001
+    get:
+      tags:
+      - Recordings
+      summary: Получить архив записей
+      parameters:
+      - name: from
+        in: query
+        schema: &id002
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        schema: *id002
+      responses:
+        '200':
+          description: Записи
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Recording'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Некорректные параметры запроса
+        details:
+          type: object
+          additionalProperties: true
+        traceId:
+          type: string
+          example: 01J0TRACEIDEXAMPLE
+    PageInfo:
+      type: object
+      required:
+      - limit
+      - offset
+      - total
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        offset:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+    Camera:
+      type: object
+      required:
+      - id
+      - deviceId
+      - houseId
+      - name
+      - status
+      properties:
+        id: *id001
+        deviceId: *id001
+        houseId: *id001
+        name:
+          type: string
+        status:
+          type: string
+          enum:
+          - ONLINE
+          - OFFLINE
+          - UNAVAILABLE
+    CreateCameraRequest:
+      type: object
+      required:
+      - deviceId
+      - houseId
+      - name
+      properties:
+        deviceId: *id001
+        houseId: *id001
+        name:
+          type: string
+    StreamAccess:
+      type: object
+      required:
+      - url
+      - expiresAt
+      properties:
+        url:
+          type: string
+          format: uri
+        protocol:
+          type: string
+          enum:
+          - HLS
+          - WEBRTC
+        expiresAt: *id002
+    Snapshot:
+      type: object
+      required:
+      - id
+      - cameraId
+      - url
+      - capturedAt
+      properties:
+        id: *id001
+        cameraId: *id001
+        url:
+          type: string
+          format: uri
+        capturedAt: *id002
+    Recording:
+      type: object
+      required:
+      - id
+      - cameraId
+      - startedAt
+      properties:
+        id: *id001
+        cameraId: *id001
+        startedAt: *id002
+        endedAt:
+          oneOf:
+          - *id002
+          - type: 'null'
+        sizeBytes:
+          type:
+          - integer
+          - 'null'
+          format: int64
+        downloadUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Требуется аутентификация
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Недостаточно прав
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Конфликт состояния ресурса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0

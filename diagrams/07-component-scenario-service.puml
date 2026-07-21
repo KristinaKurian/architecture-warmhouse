@@ -1,0 +1,34 @@
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — Scenario Service
+
+Container_Boundary(scenarioService, "Scenario Service") {
+    Component(scenarioApi, "Scenario API", "REST Controller", "Создание и управление сценариями")
+    Component(scenarioManagement, "Scenario Management Component", "Application Service", "CRUD сценариев")
+    Component(conditionEvaluator, "Condition Evaluator", "Application Service", "Проверка условий сценария")
+    Component(actionPlanner, "Action Planner", "Application Service", "Подготовка действий по сценарию")
+    Component(eventListener, "Scenario Event Listener", "Messaging Consumer", "Слушает телеметрию и события устройств")
+    Component(commandProducer, "Command Producer", "Messaging / REST Adapter", "Формирует команды для устройств")
+    Component(scenarioRepository, "Scenario Repository", "Repository", "Доступ к сценариям, условиям и действиям")
+}
+
+Container(apiGateway, "API Gateway / BFF", "Go / Node.js", "Единая точка входа")
+ContainerQueue(messageBroker, "Message Broker", "Kafka", "Команды и события")
+Container(commandService, "Device Command Service", "Go", "Команды устройствам")
+ContainerDb(scenarioDb, "Scenario DB", "PostgreSQL", "Сценарии, условия и действия")
+
+Rel(apiGateway, scenarioApi, "REST")
+Rel(scenarioApi, scenarioManagement, "")
+Rel(scenarioManagement, scenarioRepository, "Читает / пишет")
+
+Rel(messageBroker, eventListener, "Передаёт события")
+Rel(eventListener, conditionEvaluator, "Запускает проверку условий")
+Rel(conditionEvaluator, scenarioRepository, "Читает сценарии")
+Rel(conditionEvaluator, actionPlanner, "Передаёт сработавшие действия")
+Rel(actionPlanner, commandProducer, "Формирует команды")
+
+Rel(commandProducer, commandService, "Отправляет команды", "REST")
+Rel(scenarioRepository, scenarioDb, "Read / Write")
+
+@enduml

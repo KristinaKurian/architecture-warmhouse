@@ -1,0 +1,28 @@
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — Catalog Service
+
+Container_Boundary(catalogService, "Catalog Service") {
+    Component(catalogApi, "Catalog API", "REST Controller", "Предоставляет каталог устройств, модулей и комплектов")
+    Component(moduleCatalog, "Module Catalog Component", "Application Service", "Управление модулями и устройствами")
+    Component(bundleCatalog, "Bundle Catalog Component", "Application Service", "Управление комплектами")
+    Component(compatibilityComponent, "Compatibility Component", "Application Service", "Описание совместимости устройств")
+    Component(catalogRepository, "Catalog Repository", "Repository", "Доступ к каталогу")
+}
+
+Container(apiGateway, "API Gateway / BFF", "Go / Node.js", "Единая точка входа")
+ContainerDb(catalogDb, "Catalog DB", "PostgreSQL", "Каталог модулей, комплектов и совместимости")
+
+Rel(apiGateway, catalogApi, "REST")
+Rel(catalogApi, moduleCatalog, "")
+Rel(catalogApi, bundleCatalog, "")
+Rel(catalogApi, compatibilityComponent, "")
+
+Rel(moduleCatalog, catalogRepository, "Читает / пишет")
+Rel(bundleCatalog, catalogRepository, "Читает / пишет")
+Rel(compatibilityComponent, catalogRepository, "Читает / пишет")
+
+Rel(catalogRepository, catalogDb, "Read / Write")
+
+@enduml

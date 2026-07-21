@@ -1,0 +1,35 @@
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — Device Management Service
+
+Container_Boundary(deviceService, "Device Management Service") {
+    Component(deviceApi, "Device API", "REST Controller", "Регистрация, настройка и управление устройствами")
+    Component(registrationComponent, "Device Registration Component", "Application Service", "Регистрация и привязка устройства")
+    Component(deviceCatalogComponent, "Device Metadata Component", "Application Service", "Хранение типа, модели, производителя, capabilities")
+    Component(deviceBindingComponent, "Device Binding Component", "Application Service", "Привязка устройства к дому, помещению и зоне")
+    Component(deviceStatusComponent, "Device Status Component", "Application Service", "Управление статусами устройства")
+    Component(deviceRepository, "Device Repository", "Repository", "Доступ к данным устройств")
+}
+
+Container(apiGateway, "API Gateway / BFF", "Go / Node.js", "Единая точка входа")
+ContainerDb(deviceDb, "Device DB", "PostgreSQL", "Устройства, типы, модели, производители и capabilities")
+Container(houseService, "House Service", "Go", "Структура дома")
+Container(partnerService, "Partner Integration Service", "Go", "Интеграции с устройствами")
+
+Rel(apiGateway, deviceApi, "REST")
+Rel(deviceApi, registrationComponent, "")
+Rel(deviceApi, deviceCatalogComponent, "")
+Rel(deviceApi, deviceBindingComponent, "")
+Rel(deviceApi, deviceStatusComponent, "")
+
+Rel(registrationComponent, deviceRepository, "Читает / пишет")
+Rel(deviceCatalogComponent, deviceRepository, "Читает / пишет")
+Rel(deviceBindingComponent, deviceRepository, "Читает / пишет")
+Rel(deviceStatusComponent, deviceRepository, "Читает / пишет")
+
+Rel(deviceRepository, deviceDb, "Read / Write")
+Rel(deviceBindingComponent, houseService, "Проверяет дом/помещение", "REST")
+Rel(registrationComponent, partnerService, "Проверяет совместимость/адаптер", "REST")
+
+@enduml

@@ -1,0 +1,269 @@
+openapi: 3.1.1
+info:
+  title: Device Command Service API
+  version: 1.0.0
+  description: Приём команд, валидация capabilities, хранение статусов и асинхронная отправка устройствам.
+servers:
+- url: https://api.smart-home.example.com/commands/v1
+  description: Доступ через API Gateway
+- url: http://commands:8080/v1
+  description: Внутренний адрес сервиса
+security:
+- bearerAuth: []
+tags:
+- name: Commands
+paths:
+  /commands:
+    post:
+      tags:
+      - Commands
+      summary: Создать команду устройству
+      description: Возвращает команду со статусом PENDING. Фактическая доставка выполняется асинхронно через Kafka.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCommandRequest'
+      responses:
+        '202':
+          description: Команда принята
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceCommand'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /commands/{commandId}:
+    parameters:
+    - name: commandId
+      in: path
+      required: true
+      schema: &id001
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Commands
+      summary: Получить команду и текущий статус
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceCommand'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /commands/{commandId}/status-history:
+    parameters:
+    - name: commandId
+      in: path
+      required: true
+      schema: *id001
+    get:
+      tags:
+      - Commands
+      summary: История статусов команды
+      responses:
+        '200':
+          description: История статусов
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CommandStatusRecord'
+  /devices/{deviceId}/commands:
+    parameters:
+    - name: deviceId
+      in: path
+      required: true
+      schema: *id001
+    get:
+      tags:
+      - Commands
+      summary: История команд устройства
+      parameters:
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Команды устройства
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeviceCommand'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Некорректные параметры запроса
+        details:
+          type: object
+          additionalProperties: true
+        traceId:
+          type: string
+          example: 01J0TRACEIDEXAMPLE
+    PageInfo:
+      type: object
+      required:
+      - limit
+      - offset
+      - total
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        offset:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+    CreateCommandRequest:
+      type: object
+      required:
+      - deviceId
+      - commandType
+      - parameters
+      properties:
+        deviceId: *id001
+        commandType:
+          type: string
+          example: heating.set
+        parameters:
+          type: object
+          additionalProperties: true
+          example:
+            enabled: true
+            targetTemperature: 23
+        scenarioId:
+          oneOf:
+          - *id001
+          - type: 'null'
+        idempotencyKey:
+          type: string
+          maxLength: 128
+    DeviceCommand:
+      type: object
+      required:
+      - id
+      - deviceId
+      - commandType
+      - parameters
+      - status
+      - createdAt
+      properties:
+        id: *id001
+        deviceId: *id001
+        requestedByUserId:
+          oneOf:
+          - *id001
+          - type: 'null'
+        scenarioId:
+          oneOf:
+          - *id001
+          - type: 'null'
+        commandType:
+          type: string
+        parameters:
+          type: object
+          additionalProperties: true
+        status:
+          type: string
+          enum:
+          - PENDING
+          - SENT
+          - COMPLETED
+          - FAILED
+        createdAt: &id002
+          type: string
+          format: date-time
+        completedAt:
+          oneOf:
+          - *id002
+          - type: 'null'
+    CommandStatusRecord:
+      type: object
+      required:
+      - status
+      - occurredAt
+      properties:
+        status:
+          type: string
+          enum:
+          - PENDING
+          - SENT
+          - COMPLETED
+          - FAILED
+        details:
+          type: object
+          additionalProperties: true
+        occurredAt: *id002
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Требуется аутентификация
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Недостаточно прав
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Конфликт состояния ресурса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0

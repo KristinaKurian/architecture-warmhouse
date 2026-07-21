@@ -1,0 +1,31 @@
+@startuml
+!include <C4/C4_Component>
+
+title C4 Component Diagram — User Service
+
+Container_Boundary(userService, "User Service") {
+    Component(userApi, "User API", "REST Controller", "Принимает запросы на регистрацию, авторизацию и управление профилем")
+    Component(authComponent, "Authentication Component", "Application Service", "Аутентификация пользователя и проверка учётных данных")
+    Component(userProfileComponent, "User Profile Component", "Application Service", "Управление профилем пользователя")
+    Component(roleAccessComponent, "Role & Access Component", "Application Service", "Управление ролями и правами доступа")
+    Component(sessionComponent, "Session Component", "Application Service", "Управление сессиями и токенами")
+    Component(userRepository, "User Repository", "Repository", "Чтение и запись пользователей, ролей и сессий")
+}
+
+ContainerDb(userDb, "User DB", "PostgreSQL", "Пользователи, роли, права доступа")
+Container(apiGateway, "API Gateway / BFF", "Go / Node.js", "Единая точка входа")
+
+Rel(apiGateway, userApi, "REST")
+Rel(userApi, authComponent, "")
+Rel(userApi, userProfileComponent, "")
+Rel(userApi, roleAccessComponent, "")
+Rel(userApi, sessionComponent, "")
+
+Rel(authComponent, userRepository, "Читает / пишет")
+Rel(userProfileComponent, userRepository, "Читает / пишет")
+Rel(roleAccessComponent, userRepository, "Читает / пишет")
+Rel(sessionComponent, userRepository, "Читает / пишет")
+
+Rel(userRepository, userDb, "Read / Write")
+
+@enduml

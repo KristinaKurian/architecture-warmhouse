@@ -1,0 +1,357 @@
+openapi: 3.1.1
+info:
+  title: House Service API
+  version: 1.0.0
+  description: Управление домами, помещениями, зонами и доступом пользователей к дому.
+servers:
+- url: https://api.smart-home.example.com/houses/v1
+  description: Доступ через API Gateway
+- url: http://houses:8080/v1
+  description: Внутренний адрес сервиса
+security:
+- bearerAuth: []
+tags:
+- name: Houses
+- name: Rooms
+- name: Zones
+paths:
+  /houses:
+    get:
+      tags:
+      - Houses
+      summary: Список доступных пользователю домов
+      parameters:
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseList'
+    post:
+      tags:
+      - Houses
+      summary: Создать дом
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateHouseRequest'
+      responses:
+        '201':
+          description: Дом создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/House'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+  /houses/{houseId}:
+    parameters:
+    - name: houseId
+      in: path
+      required: true
+      schema: &id001
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Houses
+      summary: Получить дом
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/House'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - Houses
+      summary: Изменить дом
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateHouseRequest'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/House'
+    delete:
+      tags:
+      - Houses
+      summary: Удалить дом
+      responses:
+        '204':
+          description: Дом удалён
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /houses/{houseId}/rooms:
+    parameters:
+    - name: houseId
+      in: path
+      required: true
+      schema: *id001
+    get:
+      tags:
+      - Rooms
+      summary: Список помещений
+      responses:
+        '200':
+          description: Список помещений
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Room'
+    post:
+      tags:
+      - Rooms
+      summary: Добавить помещение
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoomRequest'
+      responses:
+        '201':
+          description: Помещение создано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Room'
+  /rooms/{roomId}/zones:
+    parameters:
+    - name: roomId
+      in: path
+      required: true
+      schema: *id001
+    post:
+      tags:
+      - Zones
+      summary: Добавить зону
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateZoneRequest'
+      responses:
+        '201':
+          description: Зона создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Zone'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Некорректные параметры запроса
+        details:
+          type: object
+          additionalProperties: true
+        traceId:
+          type: string
+          example: 01J0TRACEIDEXAMPLE
+    PageInfo:
+      type: object
+      required:
+      - limit
+      - offset
+      - total
+      properties:
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        offset:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+    House:
+      type: object
+      required:
+      - id
+      - name
+      - timezone
+      - createdAt
+      properties:
+        id: *id001
+        name:
+          type: string
+          maxLength: 255
+        address:
+          type:
+          - string
+          - 'null'
+        timezone:
+          type: string
+          example: Europe/Vienna
+        createdAt: &id002
+          type: string
+          format: date-time
+        updatedAt:
+          oneOf:
+          - *id002
+          - type: 'null'
+    CreateHouseRequest:
+      type: object
+      required:
+      - name
+      - timezone
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        address:
+          type: string
+        timezone:
+          type: string
+    UpdateHouseRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        address:
+          type:
+          - string
+          - 'null'
+        timezone:
+          type: string
+    Room:
+      type: object
+      required:
+      - id
+      - houseId
+      - name
+      properties:
+        id: *id001
+        houseId: *id001
+        name:
+          type: string
+        floor:
+          type:
+          - integer
+          - 'null'
+    CreateRoomRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+        floor:
+          type: integer
+    Zone:
+      type: object
+      required:
+      - id
+      - roomId
+      - name
+      properties:
+        id: *id001
+        roomId: *id001
+        name:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+    CreateZoneRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+    HouseList:
+      type: object
+      required:
+      - items
+      - page
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/House'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Требуется аутентификация
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Недостаточно прав
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflict:
+      description: Конфликт состояния ресурса
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
