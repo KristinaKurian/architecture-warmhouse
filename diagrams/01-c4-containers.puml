@@ -27,7 +27,7 @@ System_Boundary(system, "Экосистема умного дома") {
     Container(videoService, "Video Service", "Go", "Работа с камерами, видеопотоками и архивом")
     Container(catalogService, "Catalog Service", "Go", "Каталог модулей, комплектов и совместимых устройств")
 
-    ContainerQueue(messageBroker, "Message Broker", "Kafka / RabbitMQ / MQTT", "Асинхронный обмен командами, событиями и телеметрией")
+    ContainerQueue(messageBroker, "Message Broker", "Kafka", "Асинхронный обмен командами, событиями и телеметрией")
 
     ContainerDb(userDb, "User DB", "PostgreSQL", "Пользователи, роли и права доступа")
     ContainerDb(houseDb, "House DB", "PostgreSQL", "Дома, комнаты и зоны")
@@ -37,7 +37,7 @@ System_Boundary(system, "Экосистема умного дома") {
     ContainerDb(scenarioDb, "Scenario DB", "PostgreSQL", "Сценарии, условия и действия")
     ContainerDb(notificationDb, "Notification DB", "PostgreSQL", "История уведомлений и статусы отправки")
     ContainerDb(catalogDb, "Catalog DB", "PostgreSQL", "Каталог модулей, комплектов и совместимости")
-    ContainerDb(videoStorage, "Video Storage", "S3 / Object Storage", "Видеоархив, снимки и метаданные")
+    ContainerDb(videoStorage, "Video Storage", "S3", "Видеоархив, снимки и метаданные")
 }
 
 Rel(user, webApp, "Использует")

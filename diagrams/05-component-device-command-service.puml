@@ -4,32 +4,41 @@
 title C4 Component Diagram — Device Command Service
 
 Container_Boundary(commandService, "Device Command Service") {
-    Component(commandApi, "Command API", "REST Controller", "Принимает команды от UI и других сервисов")
-    Component(commandValidation, "Command Validation Component", "Application Service", "Проверяет допустимость команды и её параметры")
-    Component(commandExecution, "Command Execution Component", "Application Service", "Готовит и отправляет команду устройству")
-    Component(commandStatus, "Command Status Component", "Application Service", "Обновляет статус выполнения команды")
-    Component(commandHistory, "Command History Component", "Application Service", "История команд")
-    Component(commandPublisher, "Command Publisher", "Messaging Adapter", "Публикация команды в брокер")
-    Component(commandRepository, "Command Repository", "Repository", "Хранение команд и статусов")
+    Component(commandApi, "Command API", "REST Controller", "Принимает команды от пользовательского интерфейса и других сервисов, а также предоставляет текущий статус и историю команд")
+
+    Component(commandApplication, "Command Application Component", "Application Service", "Проверяет устройство и параметры команды, создаёт команду, сохраняет её и инициирует асинхронную отправку")
+
+    Component(commandPublisher, "Command Publisher", "Messaging Adapter", "Преобразует команду во внутреннее сообщение и публикует её в брокер сообщений")
+
+    Component(commandStatusConsumer, "Command Status Consumer", "Messaging Consumer", "Получает события о доставке и выполнении команды и обновляет её текущий статус")
+
+    Component(commandRepository, "Command Repository", "Repository", "Читает и сохраняет команды, их параметры, текущие статусы и историю изменения статусов")
 }
 
-Container(apiGateway, "API Gateway / BFF", "Go / Node.js", "Единая точка входа")
-Container(deviceService, "Device Management Service", "Go", "Устройства и capabilities")
-ContainerQueue(messageBroker, "Message Broker", "Kafka", "Команды и события")
-ContainerDb(commandDb, "Command DB", "PostgreSQL", "История команд и статусы выполнения")
+Container(apiGateway, "API Gateway / BFF", "Go", "Единая точка входа для клиентских приложений")
 
-Rel(apiGateway, commandApi, "REST")
-Rel(commandApi, commandValidation, "")
-Rel(commandApi, commandExecution, "")
-Rel(commandApi, commandHistory, "")
+Container(deviceService, "Device Management Service", "Go", "Предоставляет информацию об устройствах и поддерживаемых capabilities")
 
-Rel(commandValidation, deviceService, "Проверяет устройство и capability", "REST")
-Rel(commandExecution, commandPublisher, "Передаёт команду")
-Rel(commandExecution, commandRepository, "Создаёт запись команды")
-Rel(commandStatus, commandRepository, "Обновляет статус")
-Rel(commandHistory, commandRepository, "Читает историю")
+ContainerQueue(messageBroker, "Message Broker", "Kafka", "Передаёт команды устройствам и события изменения статуса команд")
 
-Rel(commandPublisher, messageBroker, "Публикует команду")
-Rel(commandRepository, commandDb, "Read / Write")
+ContainerDb(commandDb, "Command DB", "PostgreSQL", "Хранит команды, параметры, текущие статусы и историю изменения статусов")
+
+Rel(apiGateway, commandApi, "Передаёт команды и запросы истории", "REST / HTTPS")
+
+Rel(commandApi, commandApplication, "Передаёт команды и запросы получения статуса")
+
+Rel(commandApplication, deviceService, "Проверяет существование устройства и поддержку команды", "REST")
+
+Rel(commandApplication, commandRepository, "Создаёт команду и читает её состояние")
+
+Rel(commandApplication, commandPublisher, "Передаёт сохранённую команду для публикации")
+
+Rel(commandPublisher, messageBroker, "Публикует команду", "Kafka")
+
+Rel(messageBroker, commandStatusConsumer, "Передаёт события изменения статуса", "Kafka")
+
+Rel(commandStatusConsumer, commandRepository, "Обновляет статус и сохраняет историю")
+
+Rel(commandRepository, commandDb, "Читает и сохраняет данные", "SQL")
 
 @enduml

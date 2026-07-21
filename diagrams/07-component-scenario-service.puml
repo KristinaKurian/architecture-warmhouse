@@ -1,34 +1,46 @@
 @startuml
 !include <C4/C4_Component>
 
-title C4 Component Diagram — Scenario Service
+title C4 Component Diagram - Scenario Service
 
 Container_Boundary(scenarioService, "Scenario Service") {
-    Component(scenarioApi, "Scenario API", "REST Controller", "Создание и управление сценариями")
-    Component(scenarioManagement, "Scenario Management Component", "Application Service", "CRUD сценариев")
-    Component(conditionEvaluator, "Condition Evaluator", "Application Service", "Проверка условий сценария")
-    Component(actionPlanner, "Action Planner", "Application Service", "Подготовка действий по сценарию")
-    Component(eventListener, "Scenario Event Listener", "Messaging Consumer", "Слушает телеметрию и события устройств")
-    Component(commandProducer, "Command Producer", "Messaging / REST Adapter", "Формирует команды для устройств")
-    Component(scenarioRepository, "Scenario Repository", "Repository", "Доступ к сценариям, условиям и действиям")
+    Component(scenarioApi, "Scenario API", "REST Controller", "Принимает запросы на создание, изменение, включение, выключение и просмотр сценариев автоматизации")
+
+    Component(scenarioManagement, "Scenario Management Component", "Application Service", "Создаёт, изменяет, включает, выключает и удаляет сценарии, их условия и действия")
+
+    Component(eventListener, "Scenario Event Listener", "Kafka Consumer", "Получает события телеметрии и изменения состояния устройств из брокера сообщений")
+
+    Component(scenarioExecution, "Scenario Execution Component", "Application Service", "Находит подходящие сценарии, проверяет условия, формирует действия и сохраняет результаты выполнения")
+
+    Component(commandProducer, "Command Producer", "REST Adapter", "Преобразует действия сценария в команды и передаёт их в Device Command Service")
+
+    Component(scenarioRepository, "Scenario Repository", "Repository", "Читает и сохраняет сценарии, условия, действия и историю выполнения")
 }
 
-Container(apiGateway, "API Gateway / BFF", "Go / Node.js", "Единая точка входа")
-ContainerQueue(messageBroker, "Message Broker", "Kafka", "Команды и события")
-Container(commandService, "Device Command Service", "Go", "Команды устройствам")
-ContainerDb(scenarioDb, "Scenario DB", "PostgreSQL", "Сценарии, условия и действия")
+Container(apiGateway, "API Gateway / BFF", "Go", "Единая точка входа для клиентских приложений")
 
-Rel(apiGateway, scenarioApi, "REST")
-Rel(scenarioApi, scenarioManagement, "")
-Rel(scenarioManagement, scenarioRepository, "Читает / пишет")
+ContainerQueue(messageBroker, "Message Broker", "Kafka", "Передаёт события телеметрии и изменения состояния устройств")
 
-Rel(messageBroker, eventListener, "Передаёт события")
-Rel(eventListener, conditionEvaluator, "Запускает проверку условий")
-Rel(conditionEvaluator, scenarioRepository, "Читает сценарии")
-Rel(conditionEvaluator, actionPlanner, "Передаёт сработавшие действия")
-Rel(actionPlanner, commandProducer, "Формирует команды")
+Container(commandService, "Device Command Service", "Go", "Проверяет, сохраняет и отправляет команды устройствам")
 
-Rel(commandProducer, commandService, "Отправляет команды", "REST")
-Rel(scenarioRepository, scenarioDb, "Read / Write")
+ContainerDb(scenarioDb, "Scenario DB", "PostgreSQL", "Хранит сценарии, условия, действия и историю выполнения")
+
+Rel(apiGateway, scenarioApi, "Передаёт запросы управления сценариями", "REST / HTTPS")
+
+Rel(scenarioApi, scenarioManagement, "Передаёт запросы создания и изменения сценариев")
+
+Rel(scenarioManagement, scenarioRepository, "Читает и сохраняет сценарии")
+
+Rel(messageBroker, eventListener, "Передаёт события устройств и телеметрии", "Kafka")
+
+Rel(eventListener, scenarioExecution, "Передаёт событие для обработки")
+
+Rel(scenarioExecution, scenarioRepository, "Загружает сценарии и сохраняет результаты выполнения")
+
+Rel(scenarioExecution, commandProducer, "Передаёт действия сработавшего сценария")
+
+Rel(commandProducer, commandService, "Создаёт команды устройствам", "REST / HTTPS")
+
+Rel(scenarioRepository, scenarioDb, "Читает и сохраняет данные", "SQL")
 
 @enduml

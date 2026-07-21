@@ -12,7 +12,7 @@ Container_Boundary(videoService, "Video Service") {
     Component(videoRepository, "Video Metadata Repository", "Repository", "Метаданные камер и записей")
 }
 
-Container(apiGateway, "API Gateway / BFF", "Go / Node.js", "Единая точка входа")
+Container(apiGateway, "API Gateway / BFF", "Go", "Единая точка входа")
 System_Ext(videoDevices, "Камеры видеонаблюдения", "Камеры и видеопотоки")
 ContainerDb(videoStorage, "Video Storage", "S3 / Object Storage", "Видеоархив, снимки и метаданные")
 ContainerDb(videoMetaDb, "Video Metadata DB", "PostgreSQL", "Метаданные камер, потоков и записей")
@@ -23,7 +23,7 @@ Rel(videoApi, streamAccess, "")
 Rel(videoApi, snapshotComponent, "")
 Rel(videoApi, archiveComponent, "")
 
-Rel(cameraManagement, videoRepository, "Читает / пишет")
+Rel(cameraManagement, videoRepository, "")
 Rel(streamAccess, videoDevices, "Получает видеопоток")
 Rel(snapshotComponent, videoDevices, "Получает снимок")
 Rel(snapshotComponent, videoStorage, "Сохраняет снимки")

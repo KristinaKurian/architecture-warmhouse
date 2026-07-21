@@ -4,32 +4,43 @@
 title C4 Component Diagram — Device Management Service
 
 Container_Boundary(deviceService, "Device Management Service") {
-    Component(deviceApi, "Device API", "REST Controller", "Регистрация, настройка и управление устройствами")
-    Component(registrationComponent, "Device Registration Component", "Application Service", "Регистрация и привязка устройства")
-    Component(deviceCatalogComponent, "Device Metadata Component", "Application Service", "Хранение типа, модели, производителя, capabilities")
-    Component(deviceBindingComponent, "Device Binding Component", "Application Service", "Привязка устройства к дому, помещению и зоне")
-    Component(deviceStatusComponent, "Device Status Component", "Application Service", "Управление статусами устройства")
-    Component(deviceRepository, "Device Repository", "Repository", "Доступ к данным устройств")
+    Component(deviceApi, "Device API", "REST Controller", "Принимает запросы на регистрацию, настройку, привязку, получение и удаление устройств")
+
+    Component(deviceLifecycleComponent, "Device Lifecycle Component", "Application Service", "Регистрирует устройства, привязывает их к дому, комнате или зоне, изменяет привязку и выполняет отвязку")
+
+    Component(deviceMetadataComponent, "Device Metadata Component", "Application Service", "Предоставляет информацию о типах, моделях, производителях и возможностях устройств")
+
+    Component(deviceStatusComponent, "Device Status Component", "Application Service", "Обновляет и предоставляет статус устройства: online, offline, unavailable и время последней активности")
+
+    Component(deviceRepository, "Device Repository", "Repository", "Читает и сохраняет устройства, их привязки, метаданные и статусы")
 }
 
-Container(apiGateway, "API Gateway / BFF", "Go / Node.js", "Единая точка входа")
-ContainerDb(deviceDb, "Device DB", "PostgreSQL", "Устройства, типы, модели, производители и capabilities")
-Container(houseService, "House Service", "Go", "Структура дома")
-Container(partnerService, "Partner Integration Service", "Go", "Интеграции с устройствами")
+Container(apiGateway, "API Gateway / BFF", "Go", "Единая точка входа для клиентских приложений")
 
-Rel(apiGateway, deviceApi, "REST")
-Rel(deviceApi, registrationComponent, "")
-Rel(deviceApi, deviceCatalogComponent, "")
-Rel(deviceApi, deviceBindingComponent, "")
-Rel(deviceApi, deviceStatusComponent, "")
+ContainerDb(deviceDb, "Device DB", "PostgreSQL", "Хранит устройства, модели, производителей, capabilities, привязки и статусы")
 
-Rel(registrationComponent, deviceRepository, "Читает / пишет")
-Rel(deviceCatalogComponent, deviceRepository, "Читает / пишет")
-Rel(deviceBindingComponent, deviceRepository, "Читает / пишет")
-Rel(deviceStatusComponent, deviceRepository, "Читает / пишет")
+Container(houseService, "House Service", "Go", "Предоставляет информацию о домах, помещениях и зонах")
 
-Rel(deviceRepository, deviceDb, "Read / Write")
-Rel(deviceBindingComponent, houseService, "Проверяет дом/помещение", "REST")
-Rel(registrationComponent, partnerService, "Проверяет совместимость/адаптер", "REST")
+Container(partnerService, "Partner Integration Service", "Go", "Обеспечивает подключение устройств через внешние протоколы и адаптеры")
+
+Rel(apiGateway, deviceApi, "Передаёт запросы управления устройствами", "REST / HTTPS")
+
+Rel(deviceApi, deviceLifecycleComponent, "Передаёт запросы регистрации, привязки, отвязки и удаления устройств")
+
+Rel(deviceApi, deviceMetadataComponent, "Запрашивает типы, модели и возможности устройств")
+
+Rel(deviceApi, deviceStatusComponent, "Запрашивает и изменяет статус устройства")
+
+Rel(deviceLifecycleComponent, deviceRepository, "Читает и сохраняет устройства и их привязки")
+
+Rel(deviceMetadataComponent, deviceRepository, "Читает модели, производителей и capabilities")
+
+Rel(deviceStatusComponent, deviceRepository, "Читает и обновляет статус устройства")
+
+Rel(deviceLifecycleComponent, houseService, "Проверяет существование дома, комнаты или зоны", "REST")
+
+Rel(deviceLifecycleComponent, partnerService, "Инициирует подключение и проверяет внешний адаптер", "REST")
+
+Rel(deviceRepository, deviceDb, "Читает и сохраняет данные", "SQL")
 
 @enduml

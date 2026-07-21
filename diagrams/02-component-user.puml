@@ -4,28 +4,26 @@
 title C4 Component Diagram — User Service
 
 Container_Boundary(userService, "User Service") {
-    Component(userApi, "User API", "REST Controller", "Принимает запросы на регистрацию, авторизацию и управление профилем")
-    Component(authComponent, "Authentication Component", "Application Service", "Аутентификация пользователя и проверка учётных данных")
-    Component(userProfileComponent, "User Profile Component", "Application Service", "Управление профилем пользователя")
-    Component(roleAccessComponent, "Role & Access Component", "Application Service", "Управление ролями и правами доступа")
-    Component(sessionComponent, "Session Component", "Application Service", "Управление сессиями и токенами")
-    Component(userRepository, "User Repository", "Repository", "Чтение и запись пользователей, ролей и сессий")
+    Component(userApi, "User API", "REST Controller", "Принимает HTTP-запросы на регистрацию, авторизацию, управление профилем, ролями и правами доступа")
+    Component(authComponent, "Authentication & Session Component", "Application Service", "Регистрирует и аутентифицирует пользователей, проверяет учётные данные, создаёт и обновляет access- и refresh-токены, завершает пользовательские сессии")
+    Component(userProfileComponent, "User Profile Component", "Application Service", "Предоставляет и изменяет данные профиля пользователя: имя, контактные данные, настройки и статус учётной записи")
+    Component(roleAccessComponent, "Role & Access Component", "Application Service", "Управляет ролями и правами пользователей, назначает и отзывает роли, проверяет доступ к ресурсам системы")
+    Component(userRepository, "User Repository", "Repository", "Инкапсулирует чтение и сохранение пользователей, ролей, прав доступа и сессий")
 }
 
-ContainerDb(userDb, "User DB", "PostgreSQL", "Пользователи, роли, права доступа")
-Container(apiGateway, "API Gateway / BFF", "Go / Node.js", "Единая точка входа")
+ContainerDb(userDb, "User DB", "PostgreSQL", "Хранит пользователей, профили, роли, права доступа, refresh-токены и активные сессии")
+Container(apiGateway, "API Gateway / BFF", "Go", "Единая точка входа для Web и Mobile приложений, маршрутизирующая запросы к микросервисам")
 
-Rel(apiGateway, userApi, "REST")
-Rel(userApi, authComponent, "")
-Rel(userApi, userProfileComponent, "")
-Rel(userApi, roleAccessComponent, "")
-Rel(userApi, sessionComponent, "")
+Rel(apiGateway, userApi, "Передаёт запросы управления пользователями", "REST / HTTPS")
 
-Rel(authComponent, userRepository, "Читает / пишет")
-Rel(userProfileComponent, userRepository, "Читает / пишет")
-Rel(roleAccessComponent, userRepository, "Читает / пишет")
-Rel(sessionComponent, userRepository, "Читает / пишет")
+Rel(userApi, authComponent, "Передаёт запросы регистрации, входа, обновления токена и выхода")
+Rel(userApi, userProfileComponent, "Передаёт запросы чтения и изменения профиля")
+Rel(userApi, roleAccessComponent, "Передаёт запросы управления ролями и правами доступа")
 
-Rel(userRepository, userDb, "Read / Write")
+Rel(authComponent, userRepository, "Получает пользователя, проверяет учётные данные и сохраняет сессии")
+Rel(userProfileComponent, userRepository, "Читает и изменяет данные профиля")
+Rel(roleAccessComponent, userRepository, "Читает, назначает и отзывает роли и права")
+
+Rel(userRepository, userDb, "Читает и сохраняет данные", "SQL")
 
 @enduml

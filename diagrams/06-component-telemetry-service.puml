@@ -1,35 +1,41 @@
 @startuml
-!include <C4/C4_Component>
 
-title C4 Component Diagram — Telemetry Service
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title C4 Component Diagram - Telemetry Service
 
 Container_Boundary(telemetryService, "Telemetry Service") {
-    Component(telemetryApi, "Telemetry API", "REST Controller", "Предоставляет текущую и историческую телеметрию")
-    Component(telemetryIngestion, "Telemetry Ingestion Component", "Messaging Consumer", "Получает телеметрию из брокера")
-    Component(currentStateComponent, "Current State Component", "Application Service", "Поддерживает текущее состояние устройств")
-    Component(historyComponent, "Telemetry History Component", "Application Service", "Хранит исторические показания")
-    Component(telemetryEventPublisher, "Telemetry Event Publisher", "Messaging Adapter", "Публикует события изменения состояния")
-    Component(telemetryRepository, "Telemetry Repository", "Repository", "Доступ к телеметрии и состояниям")
+    Component(telemetryApi, "Telemetry API", "REST Controller", "Предоставляет текущее состояние устройств и исторические телеметрические показания")
+
+    Component(telemetryConsumer, "Telemetry Ingestion Consumer", "Kafka Consumer", "Получает телеметрические показания устройств из брокера сообщений")
+
+    Component(telemetryApplication, "Telemetry Application Component", "Application Service", "Проверяет и обрабатывает телеметрию, сохраняет историю, обновляет текущее состояние и определяет изменения значений")
+
+    Component(telemetryEventPublisher, "Telemetry Event Publisher", "Kafka Producer", "Публикует события изменения состояния и показаний устройств")
+
+    Component(telemetryRepository, "Telemetry Repository", "Repository", "Читает и сохраняет текущие состояния, метрики и исторические показания")
 }
 
-Container(apiGateway, "API Gateway / BFF", "Go / Node.js", "Единая точка входа")
-ContainerQueue(messageBroker, "Message Broker", "Kafka", "Команды и события")
-ContainerDb(telemetryDb, "Telemetry DB", "PostgreSQL", "Текущая и историческая телеметрия")
+Container(apiGateway, "API Gateway / BFF", "Go", "Единая точка входа для клиентских приложений")
 
-Rel(apiGateway, telemetryApi, "REST")
-Rel(telemetryApi, currentStateComponent, "")
-Rel(telemetryApi, historyComponent, "")
+ContainerQueue(messageBroker, "Message Broker", "Kafka", "Передаёт телеметрию и события изменения состояния устройств")
 
-Rel(messageBroker, telemetryIngestion, "Передаёт телеметрию")
-Rel(telemetryIngestion, currentStateComponent, "Обновляет состояние")
-Rel(telemetryIngestion, historyComponent, "Сохраняет показания")
+ContainerDb(telemetryDb, "Telemetry DB", "TimescaleDB / PostgreSQL", "Хранит метрики, текущие состояния и историю телеметрических показаний")
 
-Rel(currentStateComponent, telemetryRepository, "Читает / пишет")
-Rel(historyComponent, telemetryRepository, "Читает / пишет")
+Rel(apiGateway, telemetryApi, "Запрашивает текущую и историческую телеметрию", "REST / HTTPS")
 
-Rel(currentStateComponent, telemetryEventPublisher, "Публикует событие изменения")
-Rel(telemetryEventPublisher, messageBroker, "Публикует события")
+Rel(telemetryApi, telemetryApplication, "Передаёт запросы на получение телеметрии")
 
-Rel(telemetryRepository, telemetryDb, "Read / Write")
+Rel(messageBroker, telemetryConsumer, "Передаёт телеметрические показания", "Kafka")
+
+Rel(telemetryConsumer, telemetryApplication, "Передаёт полученные показания для обработки")
+
+Rel(telemetryApplication, telemetryRepository, "Читает и сохраняет телеметрию")
+
+Rel(telemetryApplication, telemetryEventPublisher, "Передаёт события изменения состояния")
+
+Rel(telemetryEventPublisher, messageBroker, "Публикует события изменения состояния", "Kafka")
+
+Rel(telemetryRepository, telemetryDb, "Читает и сохраняет данные", "SQL")
 
 @enduml
